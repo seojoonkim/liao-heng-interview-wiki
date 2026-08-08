@@ -105,8 +105,7 @@ for (const viewport of viewports) {
       await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
       await expect(page.locator('.segment-anchor')).toHaveCount(8142);
       const paragraphCount = await page.locator('.transcript-paragraph').count();
-      expect(paragraphCount).toBeGreaterThan(100);
-      expect(paragraphCount).toBeLessThan(8142);
+      expect(paragraphCount).toBe(634);
       await expect(page.locator('.segment-timestamp')).toHaveCount(paragraphCount);
       await expect(page.locator('.highlight-marker')).toHaveCount(35);
       await expect(page.locator('.transcript-chapter')).toHaveCount(7);
@@ -116,6 +115,46 @@ for (const viewport of viewports) {
       await expect(page.locator('#topic-35')).toContainText('AI 코딩');
       await expect(page.locator('.transcript-paragraph.highlighted').first()).toBeVisible();
       await expect(page.locator('.transcript-paragraph').first()).toHaveCSS('font-family', /Pretendard/);
+      await expect(page.locator('.hero-byline')).toHaveText('Curated & built by Simon Kim · Hashed');
+      await expect(page.locator('.footer-byline')).toHaveText('A project by Simon Kim at Hashed');
+      await expect(page.locator('#summary-title')).toHaveText('전체 요약');
+      await expect(page.locator('.chapter-summary')).toHaveCount(7);
+      await expect(page.locator('.chapter-summary > span')).toHaveText(Array(7).fill('이 장의 요약'));
+      await expect(page.locator('#chapter-4 .chapter-summary p')).toContainText('어센드 910에서 950');
+      const editorialGeometry = await page.evaluate(() => {
+        const heading = document.querySelector('#chapter-4 .chapter-heading');
+        const title = heading.querySelector('h2');
+        const divider = heading.querySelector('.chapter-line');
+        const paragraph = document.querySelector('.transcript-paragraph');
+        const index = document.querySelector('.transcript-highlights');
+        const marker = document.querySelector('.highlight-marker');
+        const titleStyle = getComputedStyle(title);
+        const paragraphStyle = getComputedStyle(paragraph);
+        const indexStyle = getComputedStyle(index);
+        const markerStyle = getComputedStyle(marker);
+        return {
+          headingHeight: heading.getBoundingClientRect().height,
+          titleSize: parseFloat(titleStyle.fontSize),
+          bodySize: parseFloat(paragraphStyle.fontSize),
+          bodyLineHeight: parseFloat(paragraphStyle.lineHeight),
+          dividerWidth: divider.getBoundingClientRect().width,
+          headingWidth: heading.getBoundingClientRect().width,
+          paragraphBorderTop: paragraphStyle.borderTopWidth,
+          indexBackground: indexStyle.backgroundColor,
+          indexBorder: indexStyle.borderTopWidth,
+          markerBackground: markerStyle.backgroundColor,
+          markerShadow: markerStyle.boxShadow
+        };
+      });
+      expect(editorialGeometry.headingHeight).toBeLessThan(180);
+      expect(editorialGeometry.titleSize).toBeGreaterThan(editorialGeometry.bodySize * 1.5);
+      expect(editorialGeometry.bodyLineHeight).toBeGreaterThan(editorialGeometry.bodySize * 1.75);
+      expect(editorialGeometry.dividerWidth).toBeGreaterThan(editorialGeometry.headingWidth * .9);
+      expect(editorialGeometry.paragraphBorderTop).toBe('0px');
+      expect(editorialGeometry.indexBackground).toBe('rgba(0, 0, 0, 0)');
+      expect(editorialGeometry.indexBorder).toBe('0px');
+      expect(editorialGeometry.markerBackground).toBe('rgba(0, 0, 0, 0)');
+      expect(editorialGeometry.markerShadow).toBe('none');
       const badParagraphEndings = await page.locator('.paragraph-text').evaluateAll(elements =>
         elements.filter(element => element.textContent.trim() && !/[.!?…]["'”’）)\]]*$/.test(element.textContent.trim())).length
       );
