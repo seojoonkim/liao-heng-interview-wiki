@@ -5,6 +5,117 @@ const viewports = [
   { name: 'desktop-1280', width: 1280, height: 800 }
 ];
 
+test('전사 타임스탬프는 본문 위의 독립 행이며 제목 위계가 분명하다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.transcript-paragraph')).toHaveCount(634);
+  await expect(page.locator('.paragraph-timestamp')).toHaveCount(634);
+  await expect(page.locator('.segment-anchor')).toHaveCount(8142);
+  await expect(page.locator('.highlight-marker')).toHaveCount(35);
+  await expect(page.locator('.transcript-chapter')).toHaveCount(7);
+  const contract = await page.locator('.transcript-paragraph').first().evaluate(paragraph => {
+    const timestamp = paragraph.querySelector('.paragraph-timestamp');
+    const text = paragraph.querySelector('.paragraph-text');
+    const timestampBox = timestamp.getBoundingClientRect();
+    const textBox = text.getBoundingClientRect();
+    const paragraphBox = paragraph.getBoundingClientRect();
+    return {
+      timestampBeforeText: Boolean(timestamp.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING),
+      rowGap: textBox.top - timestampBox.bottom,
+      textWidthRatio: textBox.width / paragraphBox.width,
+      timestampDisplay: getComputedStyle(timestamp).display
+    };
+  });
+  expect(contract.timestampBeforeText).toBeTruthy();
+  expect(contract.rowGap).toBeGreaterThanOrEqual(4);
+  expect(contract.textWidthRatio).toBeGreaterThan(.88);
+  expect(['block', 'grid', 'flex']).toContain(contract.timestampDisplay);
+  const hierarchy = await page.evaluate(() => {
+    const sizeWeight = selector => {
+      const style = getComputedStyle(document.querySelector(selector));
+      return { size: parseFloat(style.fontSize), weight: Number(style.fontWeight) };
+    };
+    return { hero: sizeWeight('.hero h1'), section: sizeWeight('.section-heading h2'), chapter: sizeWeight('.chapter-heading h2'), highlight: sizeWeight('.highlight-marker h3'), body: sizeWeight('.transcript-paragraph'), status: sizeWeight('#readingStatus') };
+  });
+  expect(hierarchy.hero.weight).toBeGreaterThanOrEqual(700);
+  expect(hierarchy.section.weight).toBeGreaterThanOrEqual(700);
+  expect(hierarchy.chapter.weight).toBeGreaterThanOrEqual(700);
+  expect(hierarchy.highlight.weight).toBeGreaterThanOrEqual(700);
+  expect(hierarchy.section.size).toBeGreaterThan(hierarchy.body.size * 2);
+  expect(hierarchy.chapter.size).toBeGreaterThan(hierarchy.body.size * 1.7);
+  expect(hierarchy.highlight.size).toBeGreaterThan(hierarchy.body.size * 1.25);
+  expect(hierarchy.status.size).toBeGreaterThanOrEqual(16);
+});
+
+test('모바일 목차는 헤더 아래 top sheet이며 현재 장과 topic을 동기화한다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#topic-20', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  await page.locator('#menuButton').click();
+  const drawer = page.locator('#tocDrawer');
+  await expect(drawer.locator('[data-nav-topic]')).toHaveCount(35);
+  await expect(drawer.locator('details').nth(3)).toHaveAttribute('open', '');
+  await expect(drawer.locator('[data-nav-topic="20"]')).toHaveAttribute('aria-current', 'location');
+  const geometry = await page.evaluate(() => {
+    const header = document.querySelector('.site-header').getBoundingClientRect();
+    const sheet = document.querySelector('#tocDrawer').getBoundingClientRect();
+    const style = getComputedStyle(document.querySelector('#tocDrawer'));
+    return { headerBottom: header.bottom, top: sheet.top, left: sheet.left, rightGap: innerWidth - sheet.right, width: sheet.width, maxHeight: parseFloat(style.maxHeight), overflowY: style.overflowY, transform: style.transform };
+  });
+  expect(geometry.top).toBeGreaterThanOrEqual(geometry.headerBottom - 1);
+  expect(geometry.left).toBeLessThanOrEqual(1);
+  expect(geometry.rightGap).toBeLessThanOrEqual(1);
+  expect(geometry.width).toBeLessThanOrEqual(390);
+  expect(geometry.maxHeight).toBeLessThanOrEqual(844 - geometry.headerBottom + 1);
+  expect(['auto', 'scroll']).toContain(geometry.overflowY);
+  expect(geometry.transform).toBe('none');
+  await expect(drawer).toHaveAttribute('role', 'dialog');
+  await expect(drawer).toHaveAttribute('aria-modal', 'true');
+  const backdropTop = await page.locator('#drawerBackdrop').evaluate(element => element.getBoundingClientRect().top);
+  expect(backdropTop).toBeGreaterThanOrEqual(geometry.headerBottom - 1);
+  await expect(page.locator('main')).toHaveAttribute('inert', '');
+  await expect(page.locator('.site-header')).toHaveAttribute('inert', '');
+
+  await page.locator('#closeDrawer').click();
+  await page.evaluate(() => {
+    const target = document.querySelector('#topic-28');
+    window.scrollTo(0, window.scrollY + target.getBoundingClientRect().top - 90);
+  });
+  await expect(page.locator('#currentChapterNumber')).toHaveText('CH 06');
+  await page.locator('#menuButton').click();
+  await expect(drawer.locator('details').nth(5)).toHaveAttribute('open', '');
+  await expect(drawer.locator('[data-nav-topic="28"]')).toHaveAttribute('aria-current', 'location');
+});
+
+test('초기 hash 이후 첫 메뉴도 사용자 스크롤의 현재 topic을 우선한다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#topic-20', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  await page.evaluate(() => {
+    const target = document.querySelector('#topic-28');
+    window.scrollTo(0, window.scrollY + target.getBoundingClientRect().top - 90);
+    window.dispatchEvent(new WheelEvent('wheel', { deltaY: 120 }));
+  });
+  await expect(page.locator('#currentChapterNumber')).toHaveText('CH 06');
+  await page.locator('#menuButton').click();
+  const drawer = page.locator('#tocDrawer');
+  await expect(drawer.locator('details').nth(5)).toHaveAttribute('open', '');
+  await expect(drawer.locator('[data-nav-topic="28"]')).toHaveAttribute('aria-current', 'location');
+});
+
+test('desktop rail은 현재 장의 topic만 조밀하지 않게 제공하고 직접 이동한다', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/#topic-20', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  const topics = page.locator('.desktop-rail [data-rail-topic]');
+  await expect(topics).toHaveCount(8);
+  await expect(page.locator('.desktop-rail [data-rail-topic="20"]')).toHaveAttribute('aria-current', 'location');
+  await page.locator('.desktop-rail [data-rail-topic="23"]').click();
+  await expect(page).toHaveURL(/#topic-23$/);
+  await expect.poll(() => page.locator('#topic-23').evaluate(element => element.getBoundingClientRect().top)).toBeLessThan(125);
+});
+
 test('모바일 drawer의 focus trap과 desktop resize 복원이 정상이다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });

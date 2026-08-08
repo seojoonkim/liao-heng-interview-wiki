@@ -15,12 +15,37 @@
   const backToTop = document.getElementById('backToTop');
   const chapterNumber = document.getElementById('currentChapterNumber');
   const readingStatus = document.getElementById('readingStatus');
+  const railTopics = document.getElementById('railTopics');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const modalSiblings = [...body.children].filter(element => element !== drawer && element !== backdrop);
   let lastFocus = null;
   let rendered = false;
   let scrollTicking = false;
   let chapterElements = [];
   let markerElements = [];
+  let currentRailChapter = null;
+  let activeChapter = null;
+  let activeTopic = null;
+  let initialHashPending = Boolean(location.hash);
+
+  const syncDrawerChapter = chapter => {
+    const details = [...drawer.querySelectorAll('details')];
+    details.forEach((item, index) => { item.open = chapter !== null && index + 1 === Number(chapter); });
+  };
+
+  const renderRailTopics = chapter => {
+    if (!railTopics || currentRailChapter === String(chapter)) return;
+    currentRailChapter = String(chapter);
+    railTopics.replaceChildren();
+    if (chapter === null) return;
+    const source = document.querySelector(`#chapter-${CSS.escape(String(chapter))} .transcript-highlights`);
+    source?.querySelectorAll('a[data-nav-topic]').forEach(sourceLink => {
+      const link = sourceLink.cloneNode(true);
+      link.dataset.railTopic = link.dataset.navTopic;
+      delete link.dataset.navTopic;
+      railTopics.append(link);
+    });
+  };
 
   const formatTime = value => {
     const seconds = Math.max(0, Math.floor(Number(value) || 0));
@@ -32,11 +57,20 @@
 
   const openDrawer = () => {
     lastFocus = document.activeElement;
+    updateViewportState();
+    const hashTarget = location.hash ? resolveHashTarget(location.hash) : null;
+    const fallbackChapter = hashTarget?.dataset.chapter || hashTarget?.closest('.transcript-chapter')?.dataset.chapter || null;
+    const drawerChapter = initialHashPending ? fallbackChapter || activeChapter : activeChapter;
+    const drawerTopic = initialHashPending ? hashTarget?.dataset.topic || activeTopic : activeTopic;
+    initialHashPending = false;
+    syncDrawerChapter(drawerChapter);
+    setActiveLinks('[data-nav-topic]', 'navTopic', drawerTopic);
     drawer.classList.add('open');
     drawer.setAttribute('aria-hidden', 'false');
     menuButton.setAttribute('aria-expanded', 'true');
     backdrop.hidden = false;
     body.classList.add('drawer-open');
+    modalSiblings.forEach(element => element.setAttribute('inert', ''));
     const focusCloseButton = () => {
       if (drawer.classList.contains('open')) closeButton.focus({ preventScroll: true });
     };
@@ -51,8 +85,15 @@
     menuButton.setAttribute('aria-expanded', 'false');
     backdrop.hidden = true;
     body.classList.remove('drawer-open');
+    modalSiblings.forEach(element => element.removeAttribute('inert'));
     if (restoreFocus && lastFocus instanceof HTMLElement) lastFocus.focus();
   };
+
+  const cancelInitialHashSettlement = () => { initialHashPending = false; };
+  ['wheel', 'touchmove'].forEach(type => window.addEventListener(type, cancelInitialHashSettlement, { passive: true, once: true }));
+  window.addEventListener('keydown', event => {
+    if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) cancelInitialHashSettlement();
+  });
 
   menuButton.addEventListener('click', openDrawer);
   closeButton.addEventListener('click', () => closeDrawer());
@@ -258,12 +299,18 @@
     error.hidden = true;
     transcript.setAttribute('aria-busy', 'false');
     transcript.dataset.segmentCount = String(segmentCount);
+    if (location.hash) moveToHash(location.hash, { smooth: false });
     updateViewportState();
     updateProgress();
     if (location.hash) {
-      const settleHash = () => moveToHash(location.hash, { smooth: false });
+      const settleHash = () => {
+        if (!initialHashPending) return;
+        moveToHash(location.hash, { smooth: false });
+        updateViewportState();
+      };
       requestAnimationFrame(() => requestAnimationFrame(settleHash));
       [120, 500, 1200].forEach(delay => window.setTimeout(settleHash, delay));
+      window.setTimeout(() => { initialHashPending = false; }, 1250);
     }
   };
 
@@ -287,15 +334,20 @@
     if (!currentChapter || transcript.getBoundingClientRect().top > probe) {
       chapterNumber.textContent = '00';
       readingStatus.textContent = 'OVERVIEW';
+      activeChapter = null;
+      activeTopic = null;
       setActiveLinks('[data-nav-chapter]', 'navChapter', null);
       setActiveLinks('[data-nav-topic]', 'navTopic', null);
+      renderRailTopics(null);
       return;
     }
 
     const number = currentChapter.dataset.chapter;
+    activeChapter = number;
     chapterNumber.textContent = `CH ${String(number).padStart(2, '0')}`;
     readingStatus.textContent = currentChapter.querySelector('.chapter-heading h2')?.textContent || '';
     setActiveLinks('[data-nav-chapter]', 'navChapter', number);
+    renderRailTopics(number);
 
     let currentMarker = null;
     for (const marker of markerElements) {
@@ -303,7 +355,9 @@
       else break;
     }
     const markerInChapter = currentMarker?.dataset.chapter === number ? currentMarker.dataset.topic : null;
+    activeTopic = markerInChapter;
     setActiveLinks('[data-nav-topic]', 'navTopic', markerInChapter);
+    setActiveLinks('[data-rail-topic]', 'railTopic', markerInChapter);
   };
 
   const updateProgress = () => {
