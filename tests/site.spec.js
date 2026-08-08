@@ -5,6 +5,126 @@ const viewports = [
   { name: 'desktop-1280', width: 1280, height: 800 }
 ];
 
+test('3단계 목차는 35개 topic마다 실제 전사 문단 2개를 segment anchor로 제공한다', async ({ page, request }) => {
+  const response = await request.get('/transcript-ko.json');
+  const data = await response.json();
+  const expected = data.highlights.flatMap(highlight => data.paragraphs
+    .filter(paragraph => paragraph.segmentEndId >= highlight.segmentStartId && paragraph.segmentStartId <= highlight.segmentEndId)
+    .slice(0, 2)
+    .map(paragraph => ({
+      topic: String(highlight.id),
+      href: `#segment-${paragraph.segmentStartId}`,
+      excerpt: paragraph.text.trim().slice(0, 24)
+    })));
+  expect(expected).toHaveLength(70);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#topic-1', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  await page.locator('#menuButton').click();
+  const drawerLeaves = page.locator('#tocDrawer [data-toc-leaf]');
+  await expect(page.locator('#tocDrawer [data-topic-leaves]')).toHaveCount(35);
+  await expect(drawerLeaves).toHaveCount(70);
+  const actual = await drawerLeaves.evaluateAll(links => links.map(link => ({
+    topic: link.closest('[data-topic-leaves]').dataset.topicLeaves,
+    href: link.getAttribute('href'),
+    label: link.textContent.trim()
+  })));
+  expected.forEach((item, index) => {
+    expect(actual[index].topic).toBe(item.topic);
+    expect(actual[index].href).toBe(item.href);
+    expect(actual[index].label).toContain(item.excerpt);
+    expect(actual[index].label).toMatch(/^\d{2}:\d{2}:\d{2}/);
+  });
+  await expect(page.locator('#tocDrawer [data-topic-leaves="1"]')).toBeVisible();
+  await expect(page.locator('#tocDrawer [data-topic-leaves="2"]')).toBeHidden();
+  await expect(page.locator('#tocDrawer [data-topic-toggle]')).toHaveCount(35);
+  await page.locator('#tocDrawer [data-topic-toggle="2"]').click();
+  await expect(page.locator('#tocDrawer [data-topic-leaves="2"]')).toBeVisible();
+
+  const targetHref = actual.find(item => item.topic === '1').href;
+  await page.locator(`#tocDrawer [data-toc-leaf][href="${targetHref}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`${targetHref}$`));
+  await expect(page.locator('#tocDrawer')).toHaveAttribute('aria-hidden', 'true');
+  await expect.poll(() => page.locator(targetHref).evaluate(element => element.getBoundingClientRect().top)).toBeLessThan(125);
+});
+
+test('desktop 현재 장 rail도 topic 아래 3단계 전사 링크를 표시한다', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/#topic-20', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.desktop-rail [data-rail-topic]')).toHaveCount(8);
+  await expect(page.locator('.desktop-rail [data-topic-leaves]')).toHaveCount(8);
+  await expect(page.locator('.desktop-rail [data-toc-leaf]')).toHaveCount(16);
+  await expect(page.locator('.desktop-rail [data-topic-leaves="20"]')).toBeVisible();
+  await expect(page.locator('.desktop-rail [data-topic-leaves="19"]')).toBeHidden();
+  const leaf = page.locator('.desktop-rail [data-topic-leaves="20"] [data-toc-leaf]').first();
+  const href = await leaf.getAttribute('href');
+  await leaf.click();
+  await expect(page).toHaveURL(new RegExp(`${href}$`));
+  await expect.poll(() => page.locator(href).evaluate(element => element.getBoundingClientRect().top)).toBeLessThan(125);
+});
+
+for (const viewport of viewports) {
+  test(`${viewport.name} 3단계 segment 링크의 키보드 이동은 대상 전사 문단에 포커스를 둔다`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const topic = viewport.width < 1000 ? '1' : '20';
+    await page.goto(`/#topic-${topic}`, { waitUntil: 'networkidle' });
+    await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+
+    const scope = viewport.width < 1000 ? '#tocDrawer' : '.desktop-rail';
+    if (viewport.width < 1000) await page.locator('#menuButton').click();
+    const leaf = page.locator(`${scope} [data-topic-leaves="${topic}"] [data-toc-leaf]`).first();
+    const href = await leaf.getAttribute('href');
+    const targetParagraph = page.locator(href).locator('xpath=..');
+    await expect(leaf).toBeVisible();
+    await leaf.focus();
+    await expect(leaf).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect(page).toHaveURL(new RegExp(`${href}$`));
+    if (viewport.width < 1000) await expect(page.locator('#tocDrawer')).toHaveAttribute('aria-hidden', 'true');
+    await expect(targetParagraph).toBeFocused();
+    await expect(targetParagraph).toHaveAttribute('tabindex', '-1');
+  });
+}
+
+test('warm graphite 테마, 실사용 최소 11px, 절제된 motion 계약을 지킨다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  await page.locator('#menuButton').click();
+  const contract = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const rgb = name => root.getPropertyValue(name).trim();
+    const selectors = ['.brand', '.header-status', '.kicker', '.hero-byline', '.hero-stats dt', '.source-button small', '.play', '.scroll-cue', '.chapter-index', '.chapter-summary span', '.paragraph-timestamp', '.highlight-label', '.highlight-time', '.toc-drawer details a span', '.toc-leaf-time', '.back-to-top span', 'footer', '.footer-byline'];
+    const sizes = selectors.map(selector => ({ selector, size: parseFloat(getComputedStyle(document.querySelector(selector)).fontSize) }));
+    const drawerTransition = getComputedStyle(document.querySelector('.toc-drawer')).transitionDuration;
+    const leafTransition = getComputedStyle(document.querySelector('[data-toc-leaf]')).transitionDuration;
+    const luminance = hex => {
+      const channels = hex.match(/[\da-f]{2}/gi).map(channel => parseInt(channel, 16) / 255)
+        .map(channel => channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4);
+      return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2];
+    };
+    const contrast = (foreground, background) => {
+      const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+      return (values[0] + .05) / (values[1] + .05);
+    };
+    const inactive = rgb('--inactive');
+    return {
+      colors: { bg: rgb('--bg'), panel: rgb('--panel'), panel2: rgb('--panel-2'), text: rgb('--foreground'), inactive, muted: rgb('--muted'), cyan: rgb('--ansi-cyan'), yellow: rgb('--ansi-yellow'), green: rgb('--ansi-green') },
+      inactiveContrast: [contrast(inactive, rgb('--panel')), contrast(inactive, rgb('--panel-2'))],
+      sizes, drawerTransition, leafTransition
+    };
+  });
+  expect(contract.colors).toEqual({ bg: '#24221f', panel: '#2b2824', panel2: '#34302b', text: '#ddd7cc', inactive: '#9d978e', muted: '#aaa398', cyan: '#72a9a6', yellow: '#c5a45d', green: '#7f9d84' });
+  contract.inactiveContrast.forEach(ratio => expect(ratio).toBeGreaterThanOrEqual(4.5));
+  contract.sizes.forEach(({ selector, size }) => expect(size, selector).toBeGreaterThanOrEqual(11));
+  expect(contract.drawerTransition).toMatch(/0\.[12]\d*s/);
+  expect(contract.leafTransition).toMatch(/0\.[12]\d*s/);
+});
+
 test('전사 타임스탬프는 본문 위의 독립 행이며 제목 위계가 분명하다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/', { waitUntil: 'networkidle' });
@@ -271,9 +391,9 @@ for (const viewport of viewports) {
       );
       expect(badParagraphEndings).toBe(0);
       await expect(page.locator('.site-header')).toHaveCSS('position', 'fixed');
-      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(31, 31, 31)');
-      await expect(page.locator('.brand b')).toHaveCSS('color', 'rgb(17, 168, 205)');
-      await expect(page.locator('.chapter-index').first()).toHaveCSS('color', 'rgb(229, 229, 16)');
+      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(36, 34, 31)');
+      await expect(page.locator('.brand b')).toHaveCSS('color', 'rgb(114, 169, 166)');
+      await expect(page.locator('.chapter-index').first()).toHaveCSS('color', 'rgb(197, 164, 93)');
       const headerTitleSize = await page.locator('#readingStatus').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
       expect(headerTitleSize).toBeGreaterThanOrEqual(viewport.width < 1000 ? 14 : 15);
       const timestampSize = await page.locator('.paragraph-timestamp').first().evaluate(element => parseFloat(getComputedStyle(element).fontSize));
