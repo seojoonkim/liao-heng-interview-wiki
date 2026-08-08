@@ -4,6 +4,8 @@ from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
+import json
+import math
 import re
 import sys
 
@@ -11,6 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 HTML = ROOT / "index.html"
 CSS = ROOT / "styles.css"
 JS = ROOT / "script.js"
+TRANSCRIPT = ROOT / "transcript.json"
 errors = []
 
 
@@ -129,7 +132,44 @@ for href in parser.hrefs:
     parsed = urlsplit(href)
     if "bilibili.com" in parsed.netloc.lower() and re.search(r"(?:^|&)t=\d+(?:&|$)", parsed.query):
         timestamps.append(href)
-require(len(timestamps) >= 35, f"Bilibili 타임스탬프 링크 부족: {len(timestamps)}개")
+require(len(timestamps) >= 7, f"공식 장 타임스탬프 링크 부족: {len(timestamps)}개")
+
+try:
+    transcript = json.loads(TRANSCRIPT.read_text(encoding="utf-8"))
+except Exception as exc:
+    transcript = {}
+    errors.append(f"transcript.json 파싱 실패: {exc}")
+segments = transcript.get("segments", [])
+chapters = transcript.get("chapters", [])
+highlights = transcript.get("highlights", [])
+require(len(segments) == 8142, f"전사 구간은 8,142개여야 함: {len(segments)}개")
+require(len(chapters) == 7, f"전사 장은 7개여야 함: {len(chapters)}개")
+require(len(highlights) == 35, f"중요 지점은 35개여야 함: {len(highlights)}개")
+require([item.get("id") for item in segments] == list(range(8142)), "전사 segment id가 0~8141 연속이 아님")
+require(all(set(item) == {"id", "start", "end", "text"} for item in segments), "전사 segment 필드 오류")
+require({item.get("anchor") for item in highlights} == {f"topic-{number}" for number in range(1, 36)}, "중요 지점 anchor 누락")
+number = lambda value: isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+require(all(number(item.get(key)) for item in segments for key in ("start", "end")), "전사 시간에 유한수가 아닌 값 존재")
+require(all(item.get("start", math.inf) <= item.get("end", -math.inf) for item in segments), "전사 구간에 start > end 존재")
+start_regressions = [a.get("id") for a, b in zip(segments, segments[1:]) if a.get("start", math.inf) > b.get("start", -math.inf)]
+require(start_regressions == [1968, 6726], f"예상 밖의 전사 start 순서 감소: {start_regressions}")
+require(all(segments[index].get("end") == segments[index].get("start") for index in start_regressions), "ASR start 역전 구간이 zero-length로 clamp되지 않음")
+if segments:
+    transcript_start, transcript_end = segments[0].get("start"), segments[-1].get("end")
+    require(all(
+        number(item.get("start")) and number(item.get("end"))
+        and transcript_start <= item["start"] < item["end"] <= transcript_end
+        and 0 <= item.get("segmentStartId", -1) <= item.get("segmentEndId", -1) < len(segments)
+        for item in chapters
+    ), "장 시간/segment 경계 오류")
+    require(all(chapters[index]["end"] == chapters[index + 1]["start"] for index in range(len(chapters) - 1)), "장 경계가 연속적이지 않음")
+    require(all(
+        isinstance(item.get("chapter"), int) and 1 <= item["chapter"] <= len(chapters)
+        and number(item.get("start")) and number(item.get("end"))
+        and chapters[item["chapter"] - 1]["start"] <= item["start"] < item["end"] <= chapters[item["chapter"] - 1]["end"]
+        and 0 <= item.get("segmentStartId", -1) <= item.get("segmentEndId", -1) < len(segments)
+        for item in highlights
+    ), "중요 지점 시간/segment/장 경계 오류")
 
 for asset in parser.stylesheets + parser.scripts:
     if not urlsplit(asset).scheme:
@@ -146,8 +186,9 @@ if errors:
     sys.exit(1)
 
 print("정적 검증 통과")
-print("- 주제: 35개 (topic-1~35, 각각 1회)")
+print("- 중요 지점: 35개 (topic-1~35, 각각 1회)")
 print("- 장: 7개 (chapter-1~7, 각각 1회)")
+print("- 전체 중국어 ASR 전사: 8,142개 구간, id 0~8141 연속")
 print(f"- 내부 href: {len(anchors)}개, 누락 대상 0개")
-print(f"- Bilibili 타임스탬프: {len(timestamps)}개")
+print(f"- 공식 장 Bilibili 타임스탬프: {len(timestamps)}개")
 print("- HTML 파싱/CSS 균형/로컬 자산: 정상")
