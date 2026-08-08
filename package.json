@@ -1,0 +1,18 @@
+{
+  "name": "liao-heng-interview-wiki",
+  "version": "1.0.0",
+  "private": true,
+  "description": "랴오헝 인터뷰를 7개 장과 35개 주제로 정리한 정적 웹 위키",
+  "scripts": {
+    "serve": "python3 -m http.server 4173 --bind 127.0.0.1",
+    "validate": "python3 scripts/validate.py && node --check script.js",
+    "test:browser": "playwright test",
+    "test": "npm run validate && npm run test:browser"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
