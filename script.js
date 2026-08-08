@@ -329,7 +329,7 @@
   backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' }));
   updateProgress();
 
-  fetch('transcript.json')
+  fetch('transcript-ko.json')
     .then(response => {
       if (!response.ok) throw new Error(`Transcript request failed (${response.status})`);
       return response.json();

@@ -40,15 +40,25 @@ test('모바일 drawer의 focus trap과 desktop resize 복원이 정상이다', 
 });
 
 test('모든 transcript segment의 구조와 순서가 유효하다', async ({ request }) => {
-  const response = await request.get('/transcript.json');
+  const response = await request.get('/transcript-ko.json');
   expect(response.ok()).toBeTruthy();
-  const { segments } = await response.json();
+  const sourceResponse = await request.get('/transcript.json');
+  expect(sourceResponse.ok()).toBeTruthy();
+  const { language, sourceLanguage, segments } = await response.json();
+  const { segments: sourceSegments } = await sourceResponse.json();
+  expect(language).toBe('ko');
+  expect(sourceLanguage).toBe('zh');
   expect(segments).toHaveLength(8142);
+  expect(sourceSegments).toHaveLength(8142);
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
     expect(Object.keys(segment).sort()).toEqual(['end', 'id', 'start', 'text']);
     expect(segment.id).toBe(index);
     expect(typeof segment.text).toBe('string');
+    if (sourceSegments[index].text.trim()) expect(segment.text.trim()).not.toBe('');
+    if (segment.text.trim() && !/^[\d\s.,!?]+$/.test(segment.text)) {
+      expect(segment.text).toMatch(/[가-힣]/);
+    }
     expect(Number.isFinite(segment.start)).toBeTruthy();
     expect(Number.isFinite(segment.end)).toBeTruthy();
     expect(segment.end).toBeGreaterThanOrEqual(segment.start);
@@ -70,13 +80,13 @@ for (const viewport of viewports) {
       page.on('pageerror', error => pageErrors.push(error.message));
 
       await page.goto('/', { waitUntil: 'networkidle' });
-      await expect(page).toHaveTitle(/랴오헝 인터뷰 LLM Wiki/);
+      await expect(page).toHaveTitle('랴오헝 인터뷰 — 반도체 연구자의 필드 노트');
       await expect(page.locator('#page-title')).toBeVisible();
       await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
       await expect(page.locator('.transcript-segment')).toHaveCount(8142);
       await expect(page.locator('.highlight-marker')).toHaveCount(35);
       await expect(page.locator('.transcript-chapter')).toHaveCount(7);
-      await expect(page.locator('#segment-0')).toContainText('Hello');
+      await expect(page.locator('#segment-0 .segment-text')).not.toHaveText('');
       await expect(page.locator('#segment-8141')).toBeAttached();
       await expect(page.locator('#topic-1')).toContainText('계산과 연결');
       await expect(page.locator('#topic-35')).toContainText('AI 코딩');

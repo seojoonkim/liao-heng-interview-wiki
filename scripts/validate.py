@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""정적 위키의 콘텐츠 불변 조건과 기본 문법을 검사한다."""
+"""정적 리더의 콘텐츠 불변 조건과 기본 문법을 검사한다."""
 from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parent.parent
 HTML = ROOT / "index.html"
 CSS = ROOT / "styles.css"
 JS = ROOT / "script.js"
-TRANSCRIPT = ROOT / "transcript.json"
+SOURCE_TRANSCRIPT = ROOT / "transcript.json"
+TRANSCRIPT = ROOT / "transcript-ko.json"
 errors = []
 
 
@@ -138,15 +139,35 @@ try:
     transcript = json.loads(TRANSCRIPT.read_text(encoding="utf-8"))
 except Exception as exc:
     transcript = {}
+    errors.append(f"transcript-ko.json 파싱 실패: {exc}")
+try:
+    source_transcript = json.loads(SOURCE_TRANSCRIPT.read_text(encoding="utf-8"))
+except Exception as exc:
+    source_transcript = {}
     errors.append(f"transcript.json 파싱 실패: {exc}")
 segments = transcript.get("segments", [])
+source_segments = source_transcript.get("segments", [])
 chapters = transcript.get("chapters", [])
 highlights = transcript.get("highlights", [])
+require(transcript.get("language") == "ko", "전사 language는 ko여야 함")
+require(transcript.get("sourceLanguage") == "zh", "전사 sourceLanguage는 zh여야 함")
 require(len(segments) == 8142, f"전사 구간은 8,142개여야 함: {len(segments)}개")
+require(len(source_segments) == 8142, f"원문 전사 구간은 8,142개여야 함: {len(source_segments)}개")
 require(len(chapters) == 7, f"전사 장은 7개여야 함: {len(chapters)}개")
 require(len(highlights) == 35, f"중요 지점은 35개여야 함: {len(highlights)}개")
 require([item.get("id") for item in segments] == list(range(8142)), "전사 segment id가 0~8141 연속이 아님")
 require(all(set(item) == {"id", "start", "end", "text"} for item in segments), "전사 segment 필드 오류")
+require(all(
+    not source.get("text", "").strip() or translated.get("text", "").strip()
+    for source, translated in zip(source_segments, segments)
+), "원문이 비어 있지 않은 구간에 빈 한국어 번역 존재")
+non_korean = [
+    item.get("id") for item in segments
+    if item.get("text", "").strip()
+    and not re.search(r"[가-힣]", item["text"])
+    and not re.fullmatch(r"[\d\s.,!?]+", item["text"])
+]
+require(not non_korean, f"한국어 없이 외국어만 남은 전사 구간: {non_korean[:20]}")
 require({item.get("anchor") for item in highlights} == {f"topic-{number}" for number in range(1, 36)}, "중요 지점 anchor 누락")
 number = lambda value: isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 require(all(number(item.get(key)) for item in segments for key in ("start", "end")), "전사 시간에 유한수가 아닌 값 존재")
@@ -188,7 +209,7 @@ if errors:
 print("정적 검증 통과")
 print("- 중요 지점: 35개 (topic-1~35, 각각 1회)")
 print("- 장: 7개 (chapter-1~7, 각각 1회)")
-print("- 전체 중국어 ASR 전사: 8,142개 구간, id 0~8141 연속")
+print("- 전체 한국어 번역 전사: 8,142개 구간, language=ko, sourceLanguage=zh, 번역 누락 0개")
 print(f"- 내부 href: {len(anchors)}개, 누락 대상 0개")
 print(f"- 공식 장 Bilibili 타임스탬프: {len(timestamps)}개")
 print("- HTML 파싱/CSS 균형/로컬 자산: 정상")
