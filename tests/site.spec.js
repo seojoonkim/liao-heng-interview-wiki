@@ -156,6 +156,95 @@ test('확장 제목은 390px 헤더에서 말줄임되고 목차·본문에서�
   expect(bodyFullyVisible).toBeTruthy();
 });
 
+test('본문 타이포그래피와 제목 행간은 390px·1280px에서 가독성과 전체 표시를 보존한다', async ({ page }) => {
+  const contracts = [
+    {
+      viewport: { width: 390, height: 844 },
+      sizes: {
+        '.hero-deck': 16,
+        '.summary-block li': 17,
+        '.chapter-summary p': 15.5,
+        '.topic p': 16.5,
+        '.appendix p': 16.5,
+        '.appendix li': 17,
+        '.appendix blockquote': 17,
+        '.transcript-state': 17,
+        '.transcript-disclaimer': 14,
+        '.transcript-paragraph': 16.5,
+        '.highlight-marker h3': 21
+      }
+    },
+    {
+      viewport: { width: 1280, height: 800 },
+      sizes: {
+        '.hero-deck': 16,
+        '.summary-block li': 17,
+        '.chapter-summary p': 16,
+        '.topic p': 18,
+        '.appendix p': 16.5,
+        '.appendix li': 17,
+        '.appendix blockquote': 17,
+        '.transcript-state': 17,
+        '.transcript-disclaimer': 14,
+        '.transcript-paragraph': 17
+      }
+    }
+  ];
+
+  for (const contract of contracts) {
+    await page.setViewportSize(contract.viewport);
+    await page.goto('/#chapter-4', { waitUntil: 'networkidle' });
+    await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+    await page.evaluate(() => {
+      const fixtures = [
+        ['.topic p', '<section class="topic"><p>주제 본문</p></section>'],
+        ['.appendix p', '<section class="appendix"><p>부록 본문</p><ul><li>부록 목록</li></ul><blockquote>부록 인용</blockquote></section>'],
+        ['.transcript-state', '<div class="transcript-state">상태 메시지</div>']
+      ];
+      const container = document.createElement('div');
+      container.setAttribute('data-typography-fixtures', '');
+      for (const [selector, markup] of fixtures) {
+        if (!document.querySelector(selector)) container.insertAdjacentHTML('beforeend', markup);
+      }
+      if (container.childElementCount) document.querySelector('.transcript-reader').append(container);
+    });
+
+    const result = await page.evaluate(expectedSizes => {
+      const fontSize = selector => {
+        const element = document.querySelector(selector);
+        if (!element) throw new Error(`Missing typography fixture: ${selector}`);
+        return parseFloat(getComputedStyle(element).fontSize);
+      };
+      const lineHeightRatio = selector => {
+        const element = document.querySelector(selector);
+        const style = getComputedStyle(element);
+        return parseFloat(style.lineHeight) / parseFloat(style.fontSize);
+      };
+      const title = document.querySelector('#chapter-4-title');
+      return {
+        sizes: Object.fromEntries(Object.keys(expectedSizes).map(selector => [selector, fontSize(selector)])),
+        lineHeightRatios: {
+          h1: lineHeightRatio('h1'),
+          section: lineHeightRatio('.section-heading h2'),
+          chapter: lineHeightRatio('.chapter-heading h2')
+        },
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        chapterTitleFullyVisible: title.scrollWidth <= title.clientWidth + 1
+          && title.scrollHeight <= title.clientHeight + 1
+      };
+    }, contract.sizes);
+
+    for (const [selector, expectedSize] of Object.entries(contract.sizes)) {
+      expect(result.sizes[selector], `${contract.viewport.width}px ${selector}`).toBeCloseTo(expectedSize, 4);
+    }
+    expect(result.lineHeightRatios.h1).toBeCloseTo(1, 2);
+    expect(result.lineHeightRatios.section).toBeCloseTo(1.22, 2);
+    expect(result.lineHeightRatios.chapter).toBeCloseTo(1.22, 2);
+    expect(result.horizontalOverflow).toBeLessThanOrEqual(0);
+    expect(result.chapterTitleFullyVisible).toBeTruthy();
+  }
+});
+
 test('1280px desktop rail의 확장 제목은 rail 밖으로 넘치지 않는다', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
