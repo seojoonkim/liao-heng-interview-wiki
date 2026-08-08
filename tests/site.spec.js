@@ -275,6 +275,46 @@ test('모바일 목차는 장→중요 지점 2단계 disclosure만 제공한다
   await expect(drawer.locator('[data-toc-leaf], [data-topic-toggle], [data-topic-leaves]')).toHaveCount(0);
 });
 
+test('390px 모바일 목차 번호는 상위 시작선을 맞추고 모든 중요 지점을 20px 들여쓴다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  await page.locator('#menuButton').click();
+  await page.locator('#tocDrawer details').evaluateAll(details => details.forEach(element => { element.open = true; }));
+
+  const geometry = await page.evaluate(() => {
+    const drawer = document.querySelector('#tocDrawer');
+    const drawerBox = drawer.getBoundingClientRect();
+    const drawerContentLeft = drawerBox.left + parseFloat(getComputedStyle(drawer).paddingLeft);
+    const lefts = selector => [...drawer.querySelectorAll(selector)].map(element => element.getBoundingClientRect().left);
+    const chapterNumberLefts = [
+      drawer.querySelector('nav > a').getBoundingClientRect().left,
+      ...lefts('details > summary > span')
+    ];
+    const topicNumberLefts = lefts('[data-nav-topic] > span');
+    const topicLinks = [...drawer.querySelectorAll('[data-nav-topic]')];
+    return {
+      drawerContentLeft,
+      drawerRight: drawerBox.right,
+      chapterNumberLefts,
+      topicNumberLefts,
+      topicLinksInside: topicLinks.every(link => link.getBoundingClientRect().right <= drawerBox.right + 1),
+      horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+    };
+  });
+
+  expect(geometry.chapterNumberLefts).toHaveLength(8);
+  geometry.chapterNumberLefts.forEach(left =>
+    expect(Math.abs(left - geometry.drawerContentLeft)).toBeLessThanOrEqual(1)
+  );
+  expect(geometry.topicNumberLefts).toHaveLength(35);
+  geometry.topicNumberLefts.forEach(left =>
+    expect(Math.abs(left - geometry.drawerContentLeft - 20)).toBeLessThanOrEqual(1)
+  );
+  expect(geometry.topicLinksInside).toBeTruthy();
+  expect(geometry.horizontalOverflow).toBeLessThanOrEqual(0);
+});
+
 test('desktop rail은 현재 장 topic만 제공하고 3단계 selector가 없다', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/#topic-20', { waitUntil: 'networkidle' });
