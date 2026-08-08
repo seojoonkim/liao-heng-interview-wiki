@@ -149,12 +149,28 @@ segments = transcript.get("segments", [])
 source_segments = source_transcript.get("segments", [])
 chapters = transcript.get("chapters", [])
 highlights = transcript.get("highlights", [])
+paragraphs = transcript.get("paragraphs", [])
 require(transcript.get("language") == "ko", "전사 language는 ko여야 함")
 require(transcript.get("sourceLanguage") == "zh", "전사 sourceLanguage는 zh여야 함")
 require(len(segments) == 8142, f"전사 구간은 8,142개여야 함: {len(segments)}개")
 require(len(source_segments) == 8142, f"원문 전사 구간은 8,142개여야 함: {len(source_segments)}개")
 require(len(chapters) == 7, f"전사 장은 7개여야 함: {len(chapters)}개")
 require(len(highlights) == 35, f"중요 지점은 35개여야 함: {len(highlights)}개")
+require(100 < len(paragraphs) < len(segments), f"의미 단락 수 오류: {len(paragraphs)}개")
+if paragraphs:
+    require(paragraphs[0].get("segmentStartId") == 0, "첫 단락은 segment 0부터 시작해야 함")
+    require(paragraphs[-1].get("segmentEndId") == 8141, "마지막 단락은 segment 8141까지 포함해야 함")
+    for index, paragraph in enumerate(paragraphs):
+        require(paragraph.get("id") == index, f"단락 id 오류: {index}")
+        require(paragraph.get("segmentStartId", math.inf) <= paragraph.get("segmentEndId", -math.inf), f"단락 범위 오류: {index}")
+        if index:
+            require(paragraph.get("segmentStartId") == paragraphs[index - 1].get("segmentEndId") + 1, f"단락 범위 누락/중복: {index}")
+        text = paragraph.get("text", "").strip()
+        require(not text or re.search(r"[.!?…][\"'”’）)\]]*$", text), f"단락 문장부호 누락: {index}")
+    require(all(any(
+        paragraph.get("segmentStartId") <= item.get("segmentStartId") <= paragraph.get("segmentEndId")
+        for paragraph in paragraphs
+    ) for item in highlights), "중요 지점을 포함하는 단락 누락")
 require([item.get("id") for item in segments] == list(range(8142)), "전사 segment id가 0~8141 연속이 아님")
 require(all(set(item) == {"id", "start", "end", "text"} for item in segments), "전사 segment 필드 오류")
 require(all(

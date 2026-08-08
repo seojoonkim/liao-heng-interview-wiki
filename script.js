@@ -122,29 +122,24 @@
   });
   window.addEventListener('popstate', () => moveToHash(location.hash, { smooth: false }));
 
-  const makeTimestamp = (segment, isParagraphStart) => {
+  const makeTimestamp = paragraph => {
     const link = document.createElement('a');
-    link.className = `segment-timestamp${isParagraphStart ? ' paragraph-timestamp' : ''}`;
-    link.href = `${VIDEO_URL}?t=${Math.floor(segment.start)}`;
+    link.className = 'segment-timestamp paragraph-timestamp';
+    link.href = `${VIDEO_URL}?t=${Math.floor(paragraph.start)}`;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = formatTime(segment.start);
-    link.setAttribute('aria-label', `${formatTime(segment.start)} 원본 영상에서 보기`);
+    link.textContent = formatTime(paragraph.start);
+    link.setAttribute('aria-label', `${formatTime(paragraph.start)} 원본 영상에서 보기`);
     return link;
   };
 
-  const makeSegment = (segment, isParagraphStart) => {
+  const makeSegmentAnchor = segment => {
     const span = document.createElement('span');
-    span.className = `transcript-segment${isParagraphStart ? ' paragraph-start' : ''}`;
+    span.className = 'segment-anchor';
     span.id = `segment-${segment.id}`;
     span.dataset.segmentId = String(segment.id);
     span.dataset.start = String(segment.start);
     span.dataset.end = String(segment.end);
-    span.append(makeTimestamp(segment, isParagraphStart));
-    const text = document.createElement('span');
-    text.className = 'segment-text';
-    text.textContent = segment.text || '';
-    span.append(text);
     return span;
   };
 
@@ -179,55 +174,55 @@
     return marker;
   };
 
-  const renderGroup = (segments, container, highlights) => {
+  const renderGroup = (paragraphs, segmentsById, container, highlights) => {
     const fragment = document.createDocumentFragment();
     const highlightsBySegment = new Map();
     highlights.forEach(highlight => {
-      const target = segments.find(segment => Number(segment.id) >= Number(highlight.segmentStartId))
-        || segments.find(segment => Number(segment.start) >= Number(highlight.start));
-      if (target) highlightsBySegment.set(Number(target.id), highlight);
+      const containingParagraph = paragraphs.find(paragraph =>
+        Number(paragraph.segmentStartId) <= Number(highlight.segmentStartId)
+        && Number(highlight.segmentStartId) <= Number(paragraph.segmentEndId)
+      );
+      if (containingParagraph) highlightsBySegment.set(Number(containingParagraph.segmentStartId), highlight);
     });
-    let paragraph = null;
-    let paragraphStart = 0;
     let activeHighlight = null;
 
-    segments.forEach((segment, position) => {
-      const markerData = highlightsBySegment.get(Number(segment.id));
-      const elapsed = paragraph ? Number(segment.end) - paragraphStart : 0;
-      const mustBreak = markerData || (paragraph && elapsed >= 32);
-      if (!paragraph || mustBreak) {
-        if (markerData) {
-          const marker = makeMarker(markerData);
-          fragment.append(marker);
-          activeHighlight = markerData;
-        }
-        paragraph = document.createElement('p');
-        paragraph.className = 'transcript-paragraph';
-        paragraph.dataset.start = String(segment.start);
-        if (activeHighlight && Number(segment.start) < Number(activeHighlight.end)) {
-          paragraph.classList.add('highlighted');
-          paragraph.dataset.highlight = String(activeHighlight.id);
-        } else {
-          activeHighlight = highlights.find(item => Number(segment.start) >= Number(item.start) && Number(segment.start) < Number(item.end)) || null;
-          if (activeHighlight) {
-            paragraph.classList.add('highlighted');
-            paragraph.dataset.highlight = String(activeHighlight.id);
-          }
-        }
-        paragraphStart = Number(segment.start);
-        fragment.append(paragraph);
+    paragraphs.forEach(paragraphData => {
+      const markerData = highlightsBySegment.get(Number(paragraphData.segmentStartId));
+      if (markerData) {
+        fragment.append(makeMarker(markerData));
+        activeHighlight = markerData;
       }
-      paragraph.append(makeSegment(segment, paragraph.childElementCount === 0));
-      if (position === segments.length - 1) paragraph.dataset.end = String(segment.end);
+      const paragraph = document.createElement('p');
+      paragraph.className = 'transcript-paragraph';
+      paragraph.dataset.start = String(paragraphData.start);
+      paragraph.dataset.end = String(paragraphData.end);
+      if (!activeHighlight || Number(paragraphData.start) >= Number(activeHighlight.end)) {
+        activeHighlight = highlights.find(item => Number(paragraphData.start) >= Number(item.start) && Number(paragraphData.start) < Number(item.end)) || null;
+      }
+      if (activeHighlight) {
+        paragraph.classList.add('highlighted');
+        paragraph.dataset.highlight = String(activeHighlight.id);
+      }
+      paragraph.append(makeTimestamp(paragraphData));
+      for (let id = paragraphData.segmentStartId; id <= paragraphData.segmentEndId; id += 1) {
+        const segment = segmentsById.get(Number(id));
+        if (!segment) throw new Error(`Missing segment ${id}`);
+        paragraph.append(makeSegmentAnchor(segment));
+      }
+      const text = document.createElement('span');
+      text.className = 'paragraph-text';
+      text.textContent = paragraphData.text || '';
+      paragraph.append(text);
+      fragment.append(paragraph);
     });
     container.append(fragment);
   };
 
   const renderTranscript = data => {
-    if (!data || !Array.isArray(data.segments) || !Array.isArray(data.chapters) || !Array.isArray(data.highlights)) {
+    if (!data || !Array.isArray(data.segments) || !Array.isArray(data.paragraphs) || !Array.isArray(data.chapters) || !Array.isArray(data.highlights)) {
       throw new Error('Invalid transcript data');
     }
-    if (data.segments.length !== 8142 || data.highlights.length !== 35 || data.chapters.length !== 7) {
+    if (data.segments.length !== 8142 || data.paragraphs.length <= 100 || data.highlights.length !== 35 || data.chapters.length !== 7) {
       throw new Error('Unexpected transcript metadata counts');
     }
 
@@ -237,17 +232,19 @@
     });
     document.querySelectorAll('.transcript-segments').forEach(container => container.replaceChildren());
 
-    const intro = data.segments.filter(segment => Number(segment.start) < Number(data.chapters[0].start));
-    renderGroup(intro, document.querySelector('[data-transcript-intro]'), []);
+    const segmentsById = new Map(data.segments.map(segment => [Number(segment.id), segment]));
+    const firstChapterSegment = Number(data.chapters[0].segmentStartId);
+    const intro = data.paragraphs.filter(paragraph => Number(paragraph.segmentStartId) < firstChapterSegment);
+    renderGroup(intro, segmentsById, document.querySelector('[data-transcript-intro]'), []);
 
     data.chapters.forEach((chapter, chapterIndex) => {
-      const nextStart = data.chapters[chapterIndex + 1]?.start ?? Infinity;
-      const chapterSegments = data.segments.filter(segment => Number(segment.start) >= Number(chapter.start) && Number(segment.start) < Number(nextStart));
+      const nextStartId = Number(data.chapters[chapterIndex + 1]?.segmentStartId ?? data.segments.length);
+      const chapterParagraphs = data.paragraphs.filter(paragraph => Number(paragraph.segmentStartId) >= Number(chapter.segmentStartId) && Number(paragraph.segmentStartId) < nextStartId);
       const container = document.querySelector(`[data-transcript-chapter="${chapter.id}"]`);
-      renderGroup(chapterSegments, container, data.highlights.filter(item => Number(item.chapter) === Number(chapter.id)));
+      renderGroup(chapterParagraphs, segmentsById, container, data.highlights.filter(item => Number(item.chapter) === Number(chapter.id)));
     });
 
-    const segmentCount = document.querySelectorAll('.transcript-segment').length;
+    const segmentCount = document.querySelectorAll('.segment-anchor').length;
     const markerCount = document.querySelectorAll('.highlight-marker').length;
     const populatedChapters = [...document.querySelectorAll('[data-transcript-chapter]')].filter(element => element.children.length > 0).length;
     if (segmentCount !== 8142 || markerCount !== 35 || populatedChapters !== 7) {

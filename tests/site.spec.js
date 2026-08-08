@@ -44,12 +44,32 @@ test('모든 transcript segment의 구조와 순서가 유효하다', async ({ r
   expect(response.ok()).toBeTruthy();
   const sourceResponse = await request.get('/transcript.json');
   expect(sourceResponse.ok()).toBeTruthy();
-  const { language, sourceLanguage, segments } = await response.json();
+  const { language, sourceLanguage, segments, paragraphs, highlights } = await response.json();
   const { segments: sourceSegments } = await sourceResponse.json();
   expect(language).toBe('ko');
   expect(sourceLanguage).toBe('zh');
   expect(segments).toHaveLength(8142);
   expect(sourceSegments).toHaveLength(8142);
+  expect(Array.isArray(paragraphs)).toBeTruthy();
+  expect(paragraphs.length).toBeGreaterThan(100);
+  expect(paragraphs.length).toBeLessThan(segments.length);
+  expect(paragraphs[0].segmentStartId).toBe(0);
+  expect(paragraphs.at(-1).segmentEndId).toBe(8141);
+  for (let index = 0; index < paragraphs.length; index += 1) {
+    const paragraph = paragraphs[index];
+    expect(Object.keys(paragraph).sort()).toEqual([
+      'end', 'id', 'segmentEndId', 'segmentStartId', 'start', 'text'
+    ]);
+    expect(paragraph.id).toBe(index);
+    expect(paragraph.segmentEndId).toBeGreaterThanOrEqual(paragraph.segmentStartId);
+    if (index > 0) expect(paragraph.segmentStartId).toBe(paragraphs[index - 1].segmentEndId + 1);
+    if (paragraph.text.trim()) expect(paragraph.text.trim()).toMatch(/[.!?…]["'”’）)\]]*$/);
+  }
+  for (const highlight of highlights) {
+    expect(paragraphs.some(paragraph =>
+      paragraph.segmentStartId <= highlight.segmentStartId && highlight.segmentStartId <= paragraph.segmentEndId
+    )).toBeTruthy();
+  }
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
     expect(Object.keys(segment).sort()).toEqual(['end', 'id', 'start', 'text']);
@@ -83,15 +103,23 @@ for (const viewport of viewports) {
       await expect(page).toHaveTitle('랴오헝 인터뷰 — 반도체 연구자의 필드 노트');
       await expect(page.locator('#page-title')).toBeVisible();
       await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
-      await expect(page.locator('.transcript-segment')).toHaveCount(8142);
+      await expect(page.locator('.segment-anchor')).toHaveCount(8142);
+      const paragraphCount = await page.locator('.transcript-paragraph').count();
+      expect(paragraphCount).toBeGreaterThan(100);
+      expect(paragraphCount).toBeLessThan(8142);
+      await expect(page.locator('.segment-timestamp')).toHaveCount(paragraphCount);
       await expect(page.locator('.highlight-marker')).toHaveCount(35);
       await expect(page.locator('.transcript-chapter')).toHaveCount(7);
-      await expect(page.locator('#segment-0 .segment-text')).not.toHaveText('');
+      await expect(page.locator('.transcript-paragraph .paragraph-text').first()).not.toHaveText('');
       await expect(page.locator('#segment-8141')).toBeAttached();
       await expect(page.locator('#topic-1')).toContainText('계산과 연결');
       await expect(page.locator('#topic-35')).toContainText('AI 코딩');
       await expect(page.locator('.transcript-paragraph.highlighted').first()).toBeVisible();
       await expect(page.locator('.transcript-paragraph').first()).toHaveCSS('font-family', /Pretendard/);
+      const badParagraphEndings = await page.locator('.paragraph-text').evaluateAll(elements =>
+        elements.filter(element => element.textContent.trim() && !/[.!?…]["'”’）)\]]*$/.test(element.textContent.trim())).length
+      );
+      expect(badParagraphEndings).toBe(0);
       await expect(page.locator('.site-header')).toHaveCSS('position', 'fixed');
 
       const overflow = await page.evaluate(() => ({
