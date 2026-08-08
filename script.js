@@ -27,89 +27,18 @@
   let activeChapter = null;
   let activeTopic = null;
   let initialHashPending = Boolean(location.hash);
-  const topicLeaves = new Map();
-
-  const excerptParagraph = text => {
-    const clean = String(text || '').replace(/\s+/g, ' ').trim();
-    const sentence = clean.match(/^.*?[.!?…](?:["'”’）)\]]|$)/)?.[0] || clean;
-    return sentence.length > 78 ? `${sentence.slice(0, 77).trimEnd()}…` : sentence;
-  };
-
-  const makeTopicLeaves = (topic, { rail = false } = {}) => {
-    const list = document.createElement('ul');
-    list.className = 'toc-leaves';
-    list.dataset.topicLeaves = String(topic);
-    list.hidden = true;
-    list.setAttribute('aria-label', `${String(topic).padStart(2, '0')}번 주제 대표 전사`);
-    (topicLeaves.get(String(topic)) || []).forEach(paragraph => {
-      const item = document.createElement('li');
-      const link = document.createElement('a');
-      link.className = 'toc-leaf';
-      link.dataset.tocLeaf = '';
-      if (rail) link.dataset.railLeaf = '';
-      link.href = `#segment-${paragraph.segmentStartId}`;
-      const time = document.createElement('span');
-      time.className = 'toc-leaf-time';
-      time.textContent = formatTime(paragraph.start);
-      const excerpt = document.createElement('span');
-      excerpt.className = 'toc-leaf-excerpt';
-      excerpt.textContent = excerptParagraph(paragraph.text);
-      link.append(time, excerpt);
-      item.append(link);
-      list.append(item);
-    });
-    return list;
-  };
-
-  const makeTopicToggle = topic => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'toc-topic-toggle';
-    button.dataset.topicToggle = String(topic);
-    button.setAttribute('aria-expanded', 'false');
-    button.setAttribute('aria-label', `${String(topic).padStart(2, '0')}번 주제 하위 문단 펼치기`);
-    button.innerHTML = '<span aria-hidden="true">+</span>';
-    return button;
-  };
-
-  const setTopicBranchOpen = (scope, topic, open) => {
-    const leaves = scope.querySelector(`[data-topic-leaves="${CSS.escape(String(topic))}"]`);
-    if (!leaves) return;
-    leaves.hidden = !open;
-    const toggle = scope.querySelector(`[data-topic-toggle="${CSS.escape(String(topic))}"]`);
-    if (toggle) {
-      toggle.setAttribute('aria-expanded', String(open));
-      toggle.setAttribute('aria-label', `${String(topic).padStart(2, '0')}번 주제 하위 문단 ${open ? '접기' : '펼치기'}`);
-      toggle.querySelector('span').textContent = open ? '−' : '+';
-    }
-  };
-
-  const syncTopicBranches = (scope, topic) => {
-    scope.querySelectorAll('[data-topic-leaves]').forEach(leaves => {
-      setTopicBranchOpen(scope, leaves.dataset.topicLeaves, topic !== null && leaves.dataset.topicLeaves === String(topic));
-    });
-  };
-
-  const populateTopicLeaves = data => {
-    topicLeaves.clear();
-    data.highlights.forEach(highlight => {
-      const paragraphs = data.paragraphs.filter(paragraph =>
-        Number(paragraph.segmentEndId) >= Number(highlight.segmentStartId)
-        && Number(paragraph.segmentStartId) <= Number(highlight.segmentEndId)
-      ).slice(0, 2);
-      topicLeaves.set(String(highlight.id), paragraphs);
-    });
-    drawer.querySelectorAll('a[data-nav-topic]').forEach(link => {
-      link.parentElement.querySelector(':scope > .toc-leaves')?.remove();
-      link.parentElement.querySelector(':scope > .toc-topic-toggle')?.remove();
-      link.parentElement.classList.add('toc-topic-branch');
-      link.parentElement.append(makeTopicToggle(link.dataset.navTopic), makeTopicLeaves(link.dataset.navTopic));
-    });
-  };
+  const drawerDetails = [...drawer.querySelectorAll('details')];
+  const syncDisclosureAria = details => details.querySelector('summary')?.setAttribute('aria-expanded', String(details.open));
+  drawerDetails.forEach(details => {
+    syncDisclosureAria(details);
+    details.addEventListener('toggle', () => syncDisclosureAria(details));
+  });
 
   const syncDrawerChapter = chapter => {
-    const details = [...drawer.querySelectorAll('details')];
-    details.forEach((item, index) => { item.open = chapter !== null && index + 1 === Number(chapter); });
+    drawerDetails.forEach((item, index) => {
+      item.open = chapter !== null && index + 1 === Number(chapter);
+      syncDisclosureAria(item);
+    });
   };
 
   const renderRailTopics = chapter => {
@@ -119,13 +48,10 @@
     if (chapter === null) return;
     const source = document.querySelector(`#chapter-${CSS.escape(String(chapter))} .transcript-highlights`);
     source?.querySelectorAll('a[data-nav-topic]').forEach(sourceLink => {
-      const branch = document.createElement('div');
-      branch.className = 'rail-topic-branch';
       const link = sourceLink.cloneNode(true);
       link.dataset.railTopic = link.dataset.navTopic;
       delete link.dataset.navTopic;
-      branch.append(link, makeTopicLeaves(link.dataset.railTopic, { rail: true }));
-      railTopics.append(branch);
+      railTopics.append(link);
     });
   };
 
@@ -147,7 +73,7 @@
     initialHashPending = false;
     syncDrawerChapter(drawerChapter);
     setActiveLinks('[data-nav-topic]', 'navTopic', drawerTopic);
-    syncTopicBranches(drawer, drawerTopic);
+
     drawer.classList.add('open');
     drawer.setAttribute('aria-hidden', 'false');
     menuButton.setAttribute('aria-expanded', 'true');
@@ -190,12 +116,7 @@
   menuButton.addEventListener('click', openDrawer);
   closeButton.addEventListener('click', () => closeDrawer());
   backdrop.addEventListener('click', () => closeDrawer());
-  drawer.addEventListener('click', event => {
-    const toggle = event.target.closest('[data-topic-toggle]');
-    if (!toggle) return;
-    const leaves = drawer.querySelector(`[data-topic-leaves="${CSS.escape(toggle.dataset.topicToggle)}"]`);
-    setTopicBranchOpen(drawer, toggle.dataset.topicToggle, leaves?.hidden ?? true);
-  });
+
   window.addEventListener('resize', () => {
     if (window.innerWidth >= 1000 && drawer.classList.contains('open')) {
       closeDrawer({ restoreFocus: false });
@@ -373,7 +294,7 @@
     document.querySelectorAll('.transcript-segments').forEach(container => container.replaceChildren());
 
     const segmentsById = new Map(data.segments.map(segment => [Number(segment.id), segment]));
-    populateTopicLeaves(data);
+
     const firstChapterSegment = Number(data.chapters[0].segmentStartId);
     const intro = data.paragraphs.filter(paragraph => Number(paragraph.segmentStartId) < firstChapterSegment);
     renderGroup(intro, segmentsById, document.querySelector('[data-transcript-intro]'), []);
@@ -458,7 +379,7 @@
     activeTopic = markerInChapter;
     setActiveLinks('[data-nav-topic]', 'navTopic', markerInChapter);
     setActiveLinks('[data-rail-topic]', 'railTopic', markerInChapter);
-    syncTopicBranches(railTopics, markerInChapter);
+
   };
 
   const updateProgress = () => {
