@@ -160,6 +160,13 @@ for (const viewport of viewports) {
       );
       expect(badParagraphEndings).toBe(0);
       await expect(page.locator('.site-header')).toHaveCSS('position', 'fixed');
+      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(31, 31, 31)');
+      await expect(page.locator('.brand b')).toHaveCSS('color', 'rgb(17, 168, 205)');
+      await expect(page.locator('.chapter-index').first()).toHaveCSS('color', 'rgb(229, 229, 16)');
+      const headerTitleSize = await page.locator('#readingStatus').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+      expect(headerTitleSize).toBeGreaterThanOrEqual(viewport.width < 1000 ? 14 : 15);
+      const timestampSize = await page.locator('.paragraph-timestamp').first().evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+      expect(timestampSize).toBeGreaterThanOrEqual(10);
 
       const overflow = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
