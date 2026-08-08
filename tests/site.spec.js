@@ -5,6 +5,102 @@ const viewports = [
   { name: 'desktop-1280', width: 1280, height: 800 }
 ];
 
+const expandedChapterTitles = [
+  '칩의 역사: 계산과 연결, 플랫폼 독점의 긴 일몰',
+  '무어의 법칙 이후: 공정 선폭 대신 시간·에너지로',
+  '18층 보탑: 재료부터 AI 응용까지, 전층 공동설계',
+  '화웨이 어센드의 역사: 제재 이후 공급망과 중국의 길',
+  '인재와 컴퓨팅 파워: 반복 테이프아웃과 시스템 사고',
+  'AI와 칩 기술 최전선: 오픈소스·물리 AI·광 설계',
+  '엔지니어 이야기: 열린 협업과 AI 코딩의 가능성'
+];
+
+const officialTimelineTitles = [
+  '00:02:08 칩의 역사: 독점 아래의 긴 일몰(芯片史：垄断之下漫长的日落)↗',
+  '01:17:32 무어의 법칙(摩尔定律)↗',
+  '01:31:45 18층 보탑(18层宝塔)↗',
+  '01:58:18 화웨이 어센드 역사와 중국의 길(华为昇腾史与中国道路)↗',
+  '03:21:29 인재와 컴퓨팅 파워(人才与算力)↗',
+  '03:39:23 AI와 칩 기술 최전선(AI与芯片的科技前沿)↗',
+  '04:16:45 엔지니어 이야기(工程师故事)↗'
+];
+
+test('확장 챕터 제목은 세 탐색 위치에서 일치하고 공식 타임라인 원제는 보존한다', async ({ page }) => {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const titles = await page.evaluate(() => {
+    const withoutIndex = selector => [...document.querySelectorAll(selector)].map(element => {
+      const copy = element.cloneNode(true);
+      copy.querySelector(':scope > span')?.remove();
+      return copy.textContent.trim();
+    });
+    return {
+      rail: withoutIndex('.desktop-rail [data-nav-chapter]'),
+      drawer: withoutIndex('#tocDrawer details > summary'),
+      body: [...document.querySelectorAll('.transcript-chapter .chapter-heading h2')].map(element => element.textContent.trim()),
+      timeline: [...document.querySelectorAll('#timeline li')].map(element => element.textContent.trim())
+    };
+  });
+  expect(titles.rail).toEqual(expandedChapterTitles);
+  expect(titles.drawer).toEqual(expandedChapterTitles);
+  expect(titles.body).toEqual(expandedChapterTitles);
+  expect(titles.timeline).toEqual(officialTimelineTitles);
+});
+
+test('확장 제목은 390px 헤더에서 말줄임되고 목차·본문에서는 전체 줄바꿈된다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#chapter-4', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('#readingStatus')).toHaveText(expandedChapterTitles[3]);
+  const header = await page.locator('#readingStatus').evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      textOverflow: style.textOverflow,
+      oneLine: element.getBoundingClientRect().height <= parseFloat(style.lineHeight) + 1,
+      clipped: element.scrollWidth > element.clientWidth
+    };
+  });
+  expect(header).toEqual({ textOverflow: 'ellipsis', oneLine: true, clipped: true });
+
+  await page.locator('#menuButton').click();
+  const drawerSummary = page.locator('#tocDrawer details > summary').nth(3);
+  await expect(drawerSummary).toContainText(expandedChapterTitles[3]);
+  const drawer = await drawerSummary.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      wrapped: element.getBoundingClientRect().height > parseFloat(style.lineHeight) * 1.5,
+      fullyVisible: element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1
+    };
+  });
+  expect(drawer).toEqual({ wrapped: true, fullyVisible: true });
+
+  await page.locator('#closeDrawer').click();
+  const bodyTitle = page.locator('#chapter-4-title');
+  await expect(bodyTitle).toHaveText(expandedChapterTitles[3]);
+  const bodyFullyVisible = await bodyTitle.evaluate(element =>
+    element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1
+  );
+  expect(bodyFullyVisible).toBeTruthy();
+});
+
+test('1280px desktop rail의 확장 제목은 rail 밖으로 넘치지 않는다', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const geometry = await page.evaluate(() => {
+    const root = document.documentElement;
+    const rail = document.querySelector('.desktop-rail').getBoundingClientRect();
+    const links = [...document.querySelectorAll('.desktop-rail [data-nav-chapter]')];
+    return {
+      horizontalOverflow: root.scrollWidth - root.clientWidth,
+      linksInside: links.every(link => {
+        const box = link.getBoundingClientRect();
+        return box.left >= rail.left && box.right <= rail.right && link.scrollWidth <= link.clientWidth + 1;
+      })
+    };
+  });
+  expect(geometry.horizontalOverflow).toBeLessThanOrEqual(0);
+  expect(geometry.linksInside).toBeTruthy();
+});
+
 test('모바일 목차는 장→중요 지점 2단계 disclosure만 제공한다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/#topic-20', { waitUntil: 'networkidle' });
@@ -400,7 +496,7 @@ for (const viewport of viewports) {
       }
 
       await expect(page.locator('#currentChapterNumber')).toHaveText('CH 06');
-      await expect(page.locator('#readingStatus')).toHaveText('AI와 칩 기술 최전선');
+      await expect(page.locator('#readingStatus')).toHaveText(expandedChapterTitles[5]);
       expect(pageErrors).toEqual([]);
     });
 
@@ -411,7 +507,7 @@ for (const viewport of viewports) {
       await expect.poll(topicTop, { timeout: 5000 }).toBeGreaterThanOrEqual(70);
       await expect.poll(topicTop, { timeout: 5000 }).toBeLessThan(125);
       await expect(page.locator('#currentChapterNumber')).toHaveText('CH 07');
-      await expect(page.locator('#readingStatus')).toHaveText('엔지니어 이야기');
+      await expect(page.locator('#readingStatus')).toHaveText(expandedChapterTitles[6]);
     });
   });
 }
