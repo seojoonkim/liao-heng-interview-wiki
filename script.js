@@ -28,6 +28,17 @@
   let activeTopic = null;
   let initialHashPending = Boolean(location.hash);
   const drawerDetails = [...drawer.querySelectorAll('details')];
+  const topicNumber = (chapter, index) => `${chapter}-${index + 1}`;
+  drawerDetails.forEach((details, chapterIndex) => {
+    details.querySelectorAll('[data-nav-topic] > span').forEach((label, topicIndex) => {
+      label.textContent = topicNumber(chapterIndex + 1, topicIndex);
+    });
+  });
+  document.querySelectorAll('.transcript-chapter').forEach(chapter => {
+    chapter.querySelectorAll('.transcript-highlights [data-nav-topic] > span').forEach((label, topicIndex) => {
+      label.textContent = topicNumber(chapter.dataset.chapter, topicIndex);
+    });
+  });
   const syncDisclosureAria = details => details.querySelector('summary')?.setAttribute('aria-expanded', String(details.open));
   drawerDetails.forEach(details => {
     syncDisclosureAria(details);
@@ -204,7 +215,7 @@
     return span;
   };
 
-  const makeMarker = highlight => {
+  const makeMarker = (highlight, topicIndex) => {
     const marker = document.createElement('aside');
     marker.className = 'highlight-marker';
     marker.id = highlight.anchor;
@@ -216,11 +227,8 @@
 
     const index = document.createElement('span');
     index.className = 'highlight-index';
-    index.textContent = String(highlight.id).padStart(2, '0');
+    index.textContent = topicNumber(highlight.chapter, topicIndex);
     const content = document.createElement('div');
-    const label = document.createElement('span');
-    label.className = 'highlight-label';
-    label.textContent = 'IMPORTANT TOPIC';
     const title = document.createElement('h3');
     title.id = `${highlight.anchor}-title`;
     title.textContent = highlight.title;
@@ -230,7 +238,7 @@
     time.target = '_blank';
     time.rel = 'noopener noreferrer';
     time.textContent = `${highlight.timestamp || formatTime(highlight.start)} ↗`;
-    content.append(label, title, time);
+    content.append(title, time);
     marker.append(index, content);
     return marker;
   };
@@ -250,7 +258,7 @@
     paragraphs.forEach(paragraphData => {
       const markerData = highlightsBySegment.get(Number(paragraphData.segmentStartId));
       if (markerData) {
-        fragment.append(makeMarker(markerData));
+        fragment.append(makeMarker(markerData, highlights.indexOf(markerData)));
         activeHighlight = markerData;
       }
       const paragraph = document.createElement('p');

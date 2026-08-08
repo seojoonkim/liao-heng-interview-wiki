@@ -25,6 +25,80 @@ const officialTimelineTitles = [
   '04:16:45 엔지니어 이야기(工程师故事)↗'
 ];
 
+const chapterTopicCounts = [6, 4, 6, 8, 3, 5, 3];
+const expectedTopicLabels = chapterTopicCounts.flatMap((count, chapterIndex) =>
+  Array.from({ length: count }, (_, topicIndex) => `${chapterIndex + 1}-${topicIndex + 1}`)
+);
+const expectedTopicIds = Array.from({ length: 35 }, (_, index) => String(index + 1));
+const forbiddenLabels = ['IMPORTANT TOPIC', '이 장의 요약', 'INTERVIEW OVERVIEW', 'FULL TRANSCRIPT · 한국어 번역', 'FIELD NOTE', 'NAVIGATION'];
+
+test('중요 지점은 장-로컬 번호를 쓰되 기존 topic 링크 계약을 보존한다', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  const topicContract = await page.evaluate(() => {
+    const links = selector => [...document.querySelectorAll(selector)].map(link => ({
+      id: link.dataset.navTopic,
+      href: link.getAttribute('href'),
+      label: link.querySelector(':scope > span')?.textContent.trim()
+    }));
+    return {
+      drawer: links('#tocDrawer [data-nav-topic]'),
+      body: links('.transcript-highlights [data-nav-topic]'),
+      markerIds: [...document.querySelectorAll('.highlight-marker')].map(marker => marker.id),
+      markerTopics: [...document.querySelectorAll('.highlight-marker')].map(marker => marker.dataset.topic),
+      markerLabels: [...document.querySelectorAll('.highlight-index')].map(index => index.textContent.trim())
+    };
+  });
+  const expectedLinks = expectedTopicIds.map((id, index) => ({ id, href: `#topic-${id}`, label: expectedTopicLabels[index] }));
+  expect(topicContract.drawer).toEqual(expectedLinks);
+  expect(topicContract.body).toEqual(expectedLinks);
+  expect(topicContract.markerIds).toEqual(expectedTopicIds.map(id => `topic-${id}`));
+  expect(topicContract.markerTopics).toEqual(expectedTopicIds);
+  expect(topicContract.markerLabels).toEqual(expectedTopicLabels);
+
+  const railLabels = [];
+  for (let chapter = 1; chapter <= chapterTopicCounts.length; chapter += 1) {
+    await page.evaluate(chapterNumber => {
+      const target = document.querySelector(`#chapter-${chapterNumber}`);
+      window.scrollTo(0, window.scrollY + target.getBoundingClientRect().top - 90);
+    }, chapter);
+    await expect(page.locator('.desktop-rail [data-rail-topic]')).toHaveCount(chapterTopicCounts[chapter - 1]);
+    railLabels.push(...await page.locator('.desktop-rail [data-rail-topic] > span').allTextContents());
+  }
+  expect(railLabels.map(label => label.trim())).toEqual(expectedTopicLabels);
+});
+
+test('반복 라벨은 제거하고 정보성 라벨과 marker 핵심 정보는 유지한다', async ({ page }) => {
+  await page.goto('/#topic-35', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  for (const label of forbiddenLabels) await expect(page.getByText(label, { exact: true })).toHaveCount(0);
+  await expect(page.locator('.highlight-label')).toHaveCount(0);
+  await expect(page.getByText(/^CHAPTER 0[1-7]$/)).toHaveCount(7);
+  await expect(page.getByText('INDEX / 07', { exact: true })).toHaveCount(1);
+  await expect(page.getByText('ARCHIVE 01', { exact: true })).toHaveCount(1);
+  await expect(page.getByText('FIELD NOTES', { exact: true })).toHaveCount(2);
+  await expect(page.getByText('READ', { exact: true })).toHaveCount(2);
+  await expect(page.getByText('ORIGINAL RECORDING', { exact: true })).toHaveCount(1);
+  const markerContract = await page.locator('.highlight-marker').evaluateAll(markers => markers.map(marker => ({
+    title: marker.querySelector('h3')?.textContent.trim(),
+    labelledBy: marker.getAttribute('aria-labelledby'),
+    titleId: marker.querySelector('h3')?.id,
+    timestamp: marker.querySelector('.highlight-time')?.textContent.trim(),
+    timeHref: marker.querySelector('.highlight-time')?.getAttribute('href')
+  })));
+  expect(markerContract).toHaveLength(35);
+  markerContract.forEach((marker, index) => {
+    expect(marker.title).not.toBe('');
+    expect(marker.labelledBy).toBe(marker.titleId);
+    expect(marker.titleId).toBe(`topic-${index + 1}-title`);
+    expect(marker.timestamp).toMatch(/^\d{2}:\d{2}:\d{2} ↗$/);
+    expect(marker.timeHref).toMatch(/^https:\/\/www\.bilibili\.com\/video\/BV1nB3u6tERu\/\?t=\d+$/);
+  });
+  await expect(page).toHaveURL(/#topic-35$/);
+  await expect.poll(() => page.locator('#topic-35').evaluate(element => element.getBoundingClientRect().top)).toBeLessThan(125);
+});
+
 test('확장 챕터 제목은 세 탐색 위치에서 일치하고 공식 타임라인 원제는 보존한다', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const titles = await page.evaluate(() => {
@@ -165,7 +239,7 @@ test('warm graphite 테마, 실사용 최소 11px, 절제된 motion 계약을 �
   const contract = await page.evaluate(() => {
     const root = getComputedStyle(document.documentElement);
     const rgb = name => root.getPropertyValue(name).trim();
-    const selectors = ['.brand', '.header-status', '.kicker', '.hero-byline', '.hero-stats dt', '.source-button small', '.play', '.scroll-cue', '.chapter-index', '.chapter-summary span', '.paragraph-timestamp', '.highlight-label', '.highlight-time', '.toc-drawer details a span', '.back-to-top span', 'footer', '.footer-byline'];
+    const selectors = ['.brand', '.header-status', '.kicker', '.hero-byline', '.hero-stats dt', '.source-button small', '.play', '.scroll-cue', '.chapter-index', '.paragraph-timestamp', '.highlight-time', '.toc-drawer details a span', '.back-to-top span', 'footer', '.footer-byline'];
     const sizes = selectors.map(selector => ({ selector, size: parseFloat(getComputedStyle(document.querySelector(selector)).fontSize) }));
     const drawerTransition = getComputedStyle(document.querySelector('.toc-drawer')).transitionDuration;
     const summaryTransition = getComputedStyle(document.querySelector('.toc-drawer summary')).transitionDuration;
@@ -417,7 +491,7 @@ for (const viewport of viewports) {
       await expect(page.locator('.footer-byline')).toHaveText('A project by Simon Kim at Hashed');
       await expect(page.locator('#summary-title')).toHaveText('전체 요약');
       await expect(page.locator('.chapter-summary')).toHaveCount(7);
-      await expect(page.locator('.chapter-summary > span')).toHaveText(Array(7).fill('이 장의 요약'));
+      await expect(page.locator('.chapter-summary > span')).toHaveCount(0);
       await expect(page.locator('#chapter-4 .chapter-summary p')).toContainText('어센드 910에서 950');
       const editorialGeometry = await page.evaluate(() => {
         const heading = document.querySelector('#chapter-4 .chapter-heading');
