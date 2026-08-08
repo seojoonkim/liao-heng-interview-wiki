@@ -28,6 +28,13 @@ for (const viewport of viewports) {
       }));
       expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
 
+      const topicBody = page.locator('#topic-1 .answer');
+      await expect(topicBody).toHaveCSS('font-family', /Pretendard/);
+      if (viewport.width === 390) {
+        const box = await topicBody.boundingBox();
+        expect(box.width).toBeGreaterThanOrEqual(360);
+      }
+
       const menu = page.locator('#menuButton');
       if (viewport.width < 1000) {
         await expect(menu).toBeVisible();
