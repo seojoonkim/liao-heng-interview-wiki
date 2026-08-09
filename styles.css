@@ -50,11 +50,12 @@ h1 em { color:var(--cyan); font-style:normal; } h1 span { color:var(--foreground
 .source-button:hover,.source-button:focus-visible { border-color:var(--cyan); background:var(--panel-2); transform:translateY(-2px); }
 .source-button > span:last-child { margin-left:auto; color:var(--cyan); }.source-button small { display:block; margin-bottom:3px; color:var(--muted); font:10px "IBM Plex Mono",monospace; letter-spacing:.13em; }.play { display:grid; place-items:center; width:34px; height:34px; border:1px solid var(--cyan); border-radius:50%; color:var(--cyan); font-size:11px; }
 .scroll-cue { display:flex; align-items:center; gap:9px; width:max-content; margin-top:35px!important; color:var(--muted); text-decoration:none; font:10px "IBM Plex Mono",monospace; letter-spacing:.17em; }.scroll-cue i { width:45px; height:1px; background:var(--line); position:relative; }.scroll-cue i::after {content:"";position:absolute;right:0;top:-2px;width:5px;height:5px;border-right:1px solid var(--cyan);border-bottom:1px solid var(--cyan);transform:rotate(-45deg);}
-.hero > .hero-portrait { width:150px; max-width:none; margin:0 0 18px auto; }
+.hero > .hero-portrait { width:min(100%,420px); margin:0 0 18px auto; }
 .hero-portrait::before { content:""; position:absolute; z-index:2; inset:0; border-top:1px solid color-mix(in srgb,var(--cyan) 55%,transparent); border-right:1px solid color-mix(in srgb,var(--inactive) 42%,transparent); pointer-events:none; }
-.hero-portrait a { display:block; }
-.hero-portrait img { display:block; width:100%; height:auto; filter:saturate(.78) contrast(.96); mask-image:linear-gradient(to bottom,transparent 0,#000 7%,#000 86%,transparent 100%); }
-.hero-portrait figcaption { margin-top:-4px; color:var(--inactive); text-align:right; font:10px/1.4 "IBM Plex Mono",monospace; letter-spacing:.05em; }
+.hero-portrait a { position:relative; display:block; }
+.hero-portrait img { display:block; width:100%; height:auto; filter:saturate(.78) contrast(.96); mask-image:linear-gradient(to bottom,transparent 0,#000 7%,#000 92%,transparent 100%); }
+.hero-nameplate { position:absolute; z-index:3; left:14px; bottom:13px; padding:6px 10px 7px; border-left:2px solid var(--cyan); background:rgba(17,20,23,.88); color:var(--bright-white); font:700 16px/1 var(--font-sans); letter-spacing:-.02em; }
+.hero-portrait figcaption { margin-top:5px; color:var(--inactive); text-align:right; font:10px/1.4 "IBM Plex Mono",monospace; letter-spacing:.05em; }
 .reader-shell { padding: 0 14px; }
 .content-column { max-width:var(--measure); margin:auto; }
 .content-section { padding:65px 0; border-bottom:1px solid var(--line); }

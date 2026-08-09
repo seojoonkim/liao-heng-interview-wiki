@@ -52,12 +52,13 @@ test('히어로 랴오헝 사진은 로컬 공식 출처와 접근성·반응형
     await expect(figure).toBeVisible();
     await expect(image).toHaveAttribute('src', 'assets/liao-heng-portrait.webp');
     await expect(image).toHaveAttribute('alt', /화웨이 반도체 수석과학자 랴오헝/);
-    await expect(image).toHaveAttribute('width', /^\d+$/);
-    await expect(image).toHaveAttribute('height', /^\d+$/);
+    await expect(image).toHaveAttribute('width', '658');
+    await expect(image).toHaveAttribute('height', '370');
     await expect(image).toHaveAttribute('loading', 'eager');
     await expect(image).toHaveAttribute('fetchpriority', 'high');
     await expect(source).toHaveAttribute('href', 'https://www.bilibili.com/video/BV1nB3u6tERu/');
-    await expect(figure.locator('figcaption')).toContainText('Bilibili 공식 영상 커버');
+    await expect(figure.locator('.hero-nameplate')).toHaveText('랴오헝');
+    await expect(figure.locator('figcaption')).toHaveText('Bilibili 인터뷰 장면 · 랴오헝');
 
     const geometry = await page.evaluate(() => {
       const box = selector => document.querySelector(selector).getBoundingClientRect();
@@ -68,7 +69,6 @@ test('히어로 랴오헝 사진은 로컬 공식 출처와 접근성·반응형
       const deck = box('.hero-deck');
       const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
       return {
-        hero: { top: hero.top, right: hero.right, bottom: hero.bottom, left: hero.left },
         portrait: { top: portrait.top, right: portrait.right, bottom: portrait.bottom, left: portrait.left, width: portrait.width, height: portrait.height },
         image: { width: image.getBoundingClientRect().width, height: image.getBoundingClientRect().height, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight },
         insideHero: portrait.left >= hero.left - 1 && portrait.right <= hero.right + 1 && portrait.top >= hero.top - 1 && portrait.bottom <= hero.bottom + 1,
