@@ -2,7 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/",
+      "destination": "https://carrotcave.com/voices/liao-heng",
+      "permanent": true
+    },
+    {
+      "source": "/:path+",
       "destination": "https://carrotcave.com/voices/liao-heng",
       "permanent": true
     }
