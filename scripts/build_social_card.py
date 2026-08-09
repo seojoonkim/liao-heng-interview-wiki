@@ -6,8 +6,8 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "assets" / "liao-heng-portrait.webp"
-OUTPUT = ROOT / "assets" / "og-liao-heng-right-v2.jpg"
-CONTRACT = ROOT / "assets" / "og-liao-heng-right-v2.json"
+OUTPUT = ROOT / "assets" / "og-liao-heng-right-type-v3.jpg"
+CONTRACT = ROOT / "assets" / "og-liao-heng-right-type-v3.json"
 FONT = Path("/System/Library/Fonts/AppleSDGothicNeo.ttc")
 
 W, H = 1200, 630
@@ -48,13 +48,24 @@ def font(size, index=0):
 accent = (245, 204, 65, 255)
 white = (255, 255, 255, 255)
 muted = (224, 226, 230, 255)
-draw.text((78, 112), "화웨이 반도체 수석과학자", font=font(28), fill=accent)
-draw.text((76, 174), "랴오헝 인터뷰", font=font(72), fill=white, stroke_width=1, stroke_fill=white)
-draw.text((80, 284), "반도체와 AI 시스템을 관통한", font=font(31), fill=muted)
-draw.text((80, 332), "4시간 38분", font=font(31), fill=muted)
+text_runs = [
+    ((78, 108), "화웨이 반도체 수석과학자", 31, accent),
+    ((76, 170), "랴오헝 인터뷰", 78, white),
+    ((80, 288), "반도체와 AI 시스템을 관통한", 34, muted),
+    ((80, 340), "4시간 38분", 34, muted),
+]
+text_bounds = []
+for position, text, size, color in text_runs:
+    text_font = font(size)
+    draw.text(position, text, font=text_font, fill=color, stroke_width=1 if size == 78 else 0, stroke_fill=color)
+    text_bounds.append(draw.textbbox(position, text, font=text_font, stroke_width=1 if size == 78 else 0))
 
 # A small source mark stays inside the copy-safe area without competing with the title.
-draw.text((80, 493), "FIELD NOTES  ·  07 CHAPTERS", font=font(19), fill=(178, 183, 191, 255))
+footer_position = (80, 493)
+footer_text = "FIELD NOTES  ·  07 CHAPTERS"
+footer_font = font(21)
+draw.text(footer_position, footer_text, font=footer_font, fill=(178, 183, 191, 255))
+text_bounds.append(draw.textbbox(footer_position, footer_text, font=footer_font))
 
 card.convert("RGB").save(OUTPUT, "JPEG", quality=91, optimize=True, progressive=True)
 face_center = {
@@ -74,6 +85,9 @@ contract = {
     "gradient_opaque_until_x": 470,
     "gradient_falloff_until_x": 1070,
     "required_label": "화웨이 반도체 수석과학자",
+    "font_sizes": [31, 78, 34, 34, 21],
+    "text_max_right": max(bound[2] for bound in text_bounds),
+    "text_max_bottom": max(bound[3] for bound in text_bounds),
 }
 CONTRACT.write_text(json.dumps(contract, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 print(f"built {OUTPUT.relative_to(ROOT)}; face center x={face_center['x']}; gap={contract['face_text_gap']}px")

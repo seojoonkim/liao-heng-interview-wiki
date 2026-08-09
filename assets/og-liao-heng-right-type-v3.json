@@ -1,0 +1,32 @@
+{
+  "source": "liao-heng-portrait.webp",
+  "output": "og-liao-heng-right-type-v3.jpg",
+  "canvas": [
+    1200,
+    630
+  ],
+  "source_face_center": [
+    340,
+    150
+  ],
+  "scale": 1.8237082066869301,
+  "sharp_image_x": 270,
+  "face_center": {
+    "x": 890,
+    "y": 251
+  },
+  "text_safe_right": 650,
+  "face_text_gap": 240,
+  "gradient_opaque_until_x": 470,
+  "gradient_falloff_until_x": 1070,
+  "required_label": "화웨이 반도체 수석과학자",
+  "font_sizes": [
+    31,
+    78,
+    34,
+    34,
+    21
+  ],
+  "text_max_right": 500,
+  "text_max_bottom": 512
+}
