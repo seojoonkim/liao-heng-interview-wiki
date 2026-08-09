@@ -572,6 +572,44 @@ test('Antigravity dark 기반 테마, 배경 층위, 대비와 기존 표시 계
   }
 });
 
+test('35개 중요 지점의 첫 본문 문단만 절제된 인라인 하이라이트로 표시한다', async ({ page }) => {
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/#topic-20', { waitUntil: 'networkidle' });
+    await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+
+    const result = await page.evaluate(() => {
+      const marked = [...document.querySelectorAll('.key-paragraph')];
+      const markerPairs = [...document.querySelectorAll('.highlight-marker')].map(marker => marker.nextElementSibling?.classList.contains('key-paragraph'));
+      const sample = marked[0];
+      const style = getComputedStyle(sample);
+      return {
+        count: marked.length,
+        allFollowMarkers: markerPairs.every(Boolean),
+        otherHighlightedCount: document.querySelectorAll('.transcript-paragraph.highlighted:not(.key-paragraph)').length,
+        borderLeftWidth: parseFloat(style.borderLeftWidth),
+        borderLeftColor: style.borderLeftColor,
+        backgroundImage: style.backgroundImage,
+        paddingLeft: parseFloat(style.paddingLeft),
+        textColor: style.color,
+        fullyVisible: marked.every(paragraph => paragraph.scrollWidth <= paragraph.clientWidth + 1),
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+      };
+    });
+
+    expect(result.count).toBe(35);
+    expect(result.allFollowMarkers).toBeTruthy();
+    expect(result.otherHighlightedCount).toBeGreaterThan(0);
+    expect(result.borderLeftWidth).toBe(2);
+    expect(result.borderLeftColor).toBe('rgb(245, 204, 65)');
+    expect(result.backgroundImage).not.toBe('none');
+    expect(result.paddingLeft).toBeGreaterThanOrEqual(14);
+    expect(result.textColor).toBe('rgb(255, 255, 255)');
+    expect(result.fullyVisible).toBeTruthy();
+    expect(result.horizontalOverflow).toBeLessThanOrEqual(0);
+  }
+});
+
 test('전사 타임스탬프는 본문 위의 독립 행이며 제목 위계가 분명하다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/', { waitUntil: 'networkidle' });

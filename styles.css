@@ -94,6 +94,7 @@ body.drawer-open{overflow:hidden}
 .transcript-segments { min-width: 0; max-width: 650px; }
 .transcript-paragraph { position: relative; display:grid; grid-template-columns:minmax(0,1fr); margin: 0 0 7px; padding: 0 0 25px; border: 0; color: var(--foreground); font: 400 17px/1.92 var(--font-sans); letter-spacing: 0; word-break: normal !important; overflow-wrap: break-word !important; }
 .transcript-paragraph.highlighted { color:var(--bright-white); }
+.transcript-paragraph.key-paragraph { padding-left:16px; padding-right:12px; border-left:2px solid var(--ansi-yellow); background-image:linear-gradient(90deg,color-mix(in srgb,var(--ansi-yellow) 10%,transparent),transparent 82%); }
 .segment-anchor { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; scroll-margin-top: calc(var(--header) + 18px); }
 .paragraph-text { display: block; min-width:0; width:100%; }
 .segment-timestamp { display: inline-block; }

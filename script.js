@@ -263,6 +263,7 @@
       }
       const paragraph = document.createElement('p');
       paragraph.className = 'transcript-paragraph';
+      if (markerData) paragraph.classList.add('key-paragraph');
       paragraph.dataset.start = String(paragraphData.start);
       paragraph.dataset.end = String(paragraphData.end);
       if (!activeHighlight || Number(paragraphData.start) >= Number(activeHighlight.end)) {
