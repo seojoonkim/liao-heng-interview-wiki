@@ -2,12 +2,12 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  /* Cool neutral dark terminal: layered low-chroma backgrounds. */
-  --bg: #111417; --panel: #171b1f; --panel-2: #1d2328; --line: #45515a;
-  --foreground: #e7e1d6; --bright-white: #fffaf0; --inactive: #b8b1a6;
-  --ansi-cyan: #85bfbb; --ansi-bright-cyan: #9dd0cb; --ansi-yellow: #dab968;
-  --ansi-green: #96b29a; --ansi-red: #d58b84;
-  --ink: var(--bg); --text: var(--foreground); --muted: #c0b8ad;
+  /* Sampled from Google's official Antigravity dark UI image; accents are 4% more saturated. */
+  --bg: #292c33; --panel: #2f3239; --panel-2: #36393e; --line: #484a51;
+  --foreground: #e7e7e8; --bright-white: #ffffff; --inactive: #b8bbc1;
+  --ansi-cyan: #61adab; --ansi-bright-cyan: #76b9d4; --ansi-yellow: #f5cc41;
+  --ansi-green: #63c664; --ansi-red: #ef6462;
+  --ink: var(--bg); --text: var(--foreground); --muted: #c7c9ce;
   --cyan: var(--ansi-cyan); --amber: var(--ansi-yellow);
   --header: 64px; --measure: 680px;
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
@@ -21,8 +21,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .skip-link { position: fixed; top: 8px; left: 8px; z-index: 200; padding: 12px 16px; background: var(--cyan); color: var(--ink); transform: translateY(-150%); }
 .skip-link:focus { transform: none; }
 .progress { position: fixed; top: 0; inset-inline: 0; height: 2px; z-index: 110; background: var(--panel-2); }
-.progress span { display: block; width: 0; height: 100%; background: var(--ansi-green); box-shadow: 0 0 8px rgba(127,157,132,.22); transition: width .18s linear; }
-.site-header { position: fixed; top: 0; inset-inline: 0; z-index: 100; height: var(--header); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 max(18px, env(safe-area-inset-left)); background: rgba(23,27,31,.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(12px); }
+.progress span { display: block; width: 0; height: 100%; background: var(--ansi-green); box-shadow: 0 0 8px color-mix(in srgb,var(--ansi-green) 22%,transparent); transition: width .18s linear; }
+.site-header { position: fixed; top: 0; inset-inline: 0; z-index: 100; height: var(--header); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 max(18px, env(safe-area-inset-left)); background: rgba(47,50,57,.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(12px); }
 .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--foreground); font: 500 10px/1.25 "IBM Plex Mono", monospace; letter-spacing: .13em; }
 .brand b { color: var(--cyan); font-weight: 500; }
 .brand-mark { width: 18px; height: 18px; display: inline-block; border: 1px solid var(--cyan); border-radius: 50%; box-shadow: inset 0 0 0 4px var(--ink); background: var(--cyan); position: relative; flex: 0 0 auto; }
@@ -54,7 +54,7 @@ h1 em { color:var(--cyan); font-style:normal; } h1 span { color:var(--foreground
 .hero-portrait::before { content:""; position:absolute; z-index:2; inset:0; border-top:1px solid color-mix(in srgb,var(--cyan) 55%,transparent); border-right:1px solid color-mix(in srgb,var(--inactive) 42%,transparent); pointer-events:none; }
 .hero-portrait a { position:relative; display:block; }
 .hero-portrait img { display:block; width:100%; height:auto; filter:saturate(.78) contrast(.96); mask-image:linear-gradient(to bottom,transparent 0,#000 7%,#000 92%,transparent 100%); }
-.hero-nameplate { position:absolute; z-index:3; left:14px; bottom:13px; padding:6px 10px 7px; border-left:2px solid var(--cyan); background:rgba(17,20,23,.88); color:var(--bright-white); font:700 16px/1 var(--font-sans); letter-spacing:-.02em; }
+.hero-nameplate { position:absolute; z-index:3; left:14px; bottom:13px; padding:6px 10px 7px; border-left:2px solid var(--cyan); background:rgba(41,44,51,.88); color:var(--bright-white); font:700 16px/1 var(--font-sans); letter-spacing:-.02em; }
 .hero-portrait figcaption { margin-top:5px; color:var(--inactive); text-align:right; font:10px/1.4 "IBM Plex Mono",monospace; letter-spacing:.05em; }
 .reader-shell { padding: 0 14px; }
 .content-column { max-width:var(--measure); margin:auto; }
@@ -104,7 +104,7 @@ body.drawer-open{overflow:hidden}
 .highlight-marker:target { border-top-color: var(--amber); }
 .highlight-index { display: block; width: auto; height: auto; padding-top:2px; border: 0; color: var(--ansi-yellow); font: 500 11px "IBM Plex Mono", monospace; }
 
-.highlight-marker h3 { margin: 0 0 7px; color: var(--bright-white); font: 750 22px/1.35 var(--font-sans); letter-spacing: -.03em; word-break: keep-all; overflow-wrap:anywhere; }
+.highlight-marker h3 { margin: 0 0 7px; color: var(--bright-white); font: 750 27px/1.35 var(--font-sans); letter-spacing: -.03em; word-break: keep-all; overflow-wrap:anywhere; }
 .highlight-time { display: inline-flex; min-height: 32px; align-items: center; color: var(--ansi-yellow); text-decoration: none; font: 10px "IBM Plex Mono", monospace; }
 
 
@@ -129,7 +129,7 @@ body.drawer-open{overflow:hidden}
   .transcript-paragraph { padding-bottom:22px; font-size: 16.5px; line-height: 1.9; }
   .segment-timestamp.paragraph-timestamp { font-size: 12px; }
   .highlight-marker { margin-top: 44px; padding: 16px 0 13px; }
-  .highlight-marker h3 { font-size: 22px; }
+  .highlight-marker h3 { font-size: 24px; }
   footer { flex-wrap:wrap; }
   .footer-byline { flex-basis:100%; padding-left:30px; }
 }

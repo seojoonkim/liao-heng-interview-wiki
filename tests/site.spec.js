@@ -287,7 +287,7 @@ test('본문 타이포그래피와 제목 행간은 390px·1280px에서 가독�
         '.transcript-state': 17,
         '.transcript-disclaimer': 14,
         '.transcript-paragraph': 16.5,
-        '.highlight-marker h3': 22
+        '.highlight-marker h3': 24
       }
     },
     {
@@ -302,7 +302,8 @@ test('본문 타이포그래피와 제목 행간은 390px·1280px에서 가독�
         '.appendix blockquote': 17,
         '.transcript-state': 17,
         '.transcript-disclaimer': 14,
-        '.transcript-paragraph': 17
+        '.transcript-paragraph': 17,
+        '.highlight-marker h3': 27
       }
     }
   ];
@@ -496,15 +497,15 @@ test('전체 요약은 구분선과 장식 아이콘 없이 포멀한 불릿 목
   expect(style.beforeContent).toBe('none');
 });
 
-test('cool neutral dark terminal 테마, 배경 층위, 대비와 기존 표시 계약을 지킨다', async ({ page }) => {
+test('Antigravity dark 기반 테마, 배경 층위, 대비와 기존 표시 계약을 지킨다', async ({ page }) => {
   const expectedColors = {
-    bg: '#111417', panel: '#171b1f', panel2: '#1d2328', line: '#45515a',
-    foreground: '#e7e1d6', brightWhite: '#fffaf0', inactive: '#b8b1a6', muted: '#c0b8ad',
-    cyan: '#85bfbb', yellow: '#dab968', green: '#96b29a', red: '#d58b84'
+    bg: '#292c33', panel: '#2f3239', panel2: '#36393e', line: '#484a51',
+    foreground: '#e7e7e8', brightWhite: '#ffffff', inactive: '#b8bbc1', muted: '#c7c9ce',
+    cyan: '#61adab', yellow: '#f5cc41', green: '#63c664', red: '#ef6462'
   };
   const expectedBackgrounds = {
-    body: 'rgb(17, 20, 23)', drawer: 'rgb(23, 27, 31)', rail: 'rgb(23, 27, 31)',
-    header: 'rgba(23, 27, 31, 0.94)'
+    body: 'rgb(41, 44, 51)', drawer: 'rgb(47, 50, 57)', rail: 'rgb(47, 50, 57)',
+    header: 'rgba(47, 50, 57, 0.94)'
   };
 
   for (const viewport of viewports) {
