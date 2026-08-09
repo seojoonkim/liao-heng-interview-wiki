@@ -6,8 +6,8 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "assets" / "liao-heng-portrait.webp"
-OUTPUT = ROOT / "assets" / "og-liao-heng-right-type-v4.jpg"
-CONTRACT = ROOT / "assets" / "og-liao-heng-right-type-v4.json"
+OUTPUT = ROOT / "assets" / "og-liao-heng-right-type-v5.jpg"
+CONTRACT = ROOT / "assets" / "og-liao-heng-right-type-v5.json"
 FONT = Path("/System/Library/Fonts/AppleSDGothicNeo.ttc")
 
 W, H = 1200, 630
@@ -49,10 +49,10 @@ accent = (245, 204, 65, 255)
 white = (255, 255, 255, 255)
 muted = (224, 226, 230, 255)
 text_runs = [
-    ((78, 106), "화웨이 반도체 수석과학자", 33, accent),
-    ((76, 166), "랴오헝 인터뷰", 82, white),
-    ((80, 288), "반도체와 AI 시스템을 관통한", 36, muted),
-    ((80, 342), "4시간 38분", 36, muted),
+    ((78, 104), "화웨이 반도체 수석과학자", 35, accent),
+    ((76, 162), "랴오헝 인터뷰", 86, white),
+    ((80, 288), "반도체와 AI 시스템을 관통한", 38, muted),
+    ((80, 344), "4시간 38분", 38, muted),
 ]
 text_bounds = []
 for position, text, size, color in text_runs:
@@ -63,7 +63,7 @@ for position, text, size, color in text_runs:
 # A small source mark stays inside the copy-safe area without competing with the title.
 footer_position = (80, 493)
 footer_text = "FIELD NOTES  ·  07 CHAPTERS"
-footer_font = font(22)
+footer_font = font(24)
 draw.text(footer_position, footer_text, font=footer_font, fill=(178, 183, 191, 255))
 text_bounds.append(draw.textbbox(footer_position, footer_text, font=footer_font))
 
@@ -85,7 +85,7 @@ contract = {
     "gradient_opaque_until_x": 470,
     "gradient_falloff_until_x": 1070,
     "required_label": "화웨이 반도체 수석과학자",
-    "font_sizes": [33, 82, 36, 36, 22],
+    "font_sizes": [35, 86, 38, 38, 24],
     "text_max_right": max(bound[2] for bound in text_bounds),
     "text_max_bottom": max(bound[3] for bound in text_bounds),
 }
