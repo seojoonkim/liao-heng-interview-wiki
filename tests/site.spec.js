@@ -498,9 +498,9 @@ test('전체 요약은 구분선과 장식 아이콘 없이 포멀한 불릿 목
 
 test('cool neutral dark terminal 테마, 배경 층위, 대비와 기존 표시 계약을 지킨다', async ({ page }) => {
   const expectedColors = {
-    bg: '#111417', panel: '#171b1f', panel2: '#1d2328', line: '#343d44',
-    foreground: '#ddd7cc', brightWhite: '#f2ede3', inactive: '#9d978e', muted: '#aaa398',
-    cyan: '#72a9a6', yellow: '#c5a45d', green: '#7f9d84', red: '#bd7770'
+    bg: '#111417', panel: '#171b1f', panel2: '#1d2328', line: '#45515a',
+    foreground: '#e7e1d6', brightWhite: '#fffaf0', inactive: '#b8b1a6', muted: '#c0b8ad',
+    cyan: '#85bfbb', yellow: '#dab968', green: '#96b29a', red: '#d58b84'
   };
   const expectedBackgrounds = {
     body: 'rgb(17, 20, 23)', drawer: 'rgb(23, 27, 31)', rail: 'rgb(23, 27, 31)',

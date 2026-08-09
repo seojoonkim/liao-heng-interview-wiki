@@ -3,11 +3,11 @@
 
 :root {
   /* Cool neutral dark terminal: layered low-chroma backgrounds. */
-  --bg: #111417; --panel: #171b1f; --panel-2: #1d2328; --line: #343d44;
-  --foreground: #ddd7cc; --bright-white: #f2ede3; --inactive: #9d978e;
-  --ansi-cyan: #72a9a6; --ansi-bright-cyan: #8bbab5; --ansi-yellow: #c5a45d;
-  --ansi-green: #7f9d84; --ansi-red: #bd7770;
-  --ink: var(--bg); --text: var(--foreground); --muted: #aaa398;
+  --bg: #111417; --panel: #171b1f; --panel-2: #1d2328; --line: #45515a;
+  --foreground: #e7e1d6; --bright-white: #fffaf0; --inactive: #b8b1a6;
+  --ansi-cyan: #85bfbb; --ansi-bright-cyan: #9dd0cb; --ansi-yellow: #dab968;
+  --ansi-green: #96b29a; --ansi-red: #d58b84;
+  --ink: var(--bg); --text: var(--foreground); --muted: #c0b8ad;
   --cyan: var(--ansi-cyan); --amber: var(--ansi-yellow);
   --header: 64px; --measure: 680px;
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
