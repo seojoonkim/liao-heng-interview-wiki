@@ -23,6 +23,7 @@ SOCIAL_TITLE = "랴오헝 인터뷰 — 반도체 연구자의 필드 노트"
 SOCIAL_DESCRIPTION = "화웨이 반도체 수석과학자 랴오헝의 4시간 38분 인터뷰를 7개 장, 35개 중요 지점, 전체 한국어 번역 전사로 읽는 필드 노트."
 OG_IMAGE_ALT = "랴오헝 인터뷰 필드 노트 — 랴오헝 사진과 7개 장·35개 중요 지점 안내"
 errors = []
+SOCIAL_ONLY = "--social-only" in sys.argv[1:]
 
 
 def require(condition, message):
@@ -165,6 +166,16 @@ try:
 except Exception as exc:
     errors.append(f"OG 이미지 검사 실패: {exc}")
 require(OG_IMAGE.is_file() and OG_IMAGE.stat().st_size <= 500_000, "OG 이미지는 존재하며 500KB 이하여야 함")
+if SOCIAL_ONLY:
+    if errors:
+        print("소셜 카드 검증 실패:")
+        for error in errors:
+            print(f"- {error}")
+        sys.exit(1)
+    print("소셜 카드 검증 통과")
+    print("- canonical/Open Graph/Twitter 원본 HTML 메타: 정상")
+    print("- OG 이미지: JPEG, RGB, 1200×630, 500KB 이하")
+    sys.exit(0)
 id_counts = Counter(parser.ids)
 duplicates = sorted(value for value, count in id_counts.items() if count > 1)
 require(not duplicates, f"중복 id: {duplicates}")

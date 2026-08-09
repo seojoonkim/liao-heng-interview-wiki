@@ -15,16 +15,6 @@ const expandedChapterTitles = [
   '엔지니어 이야기: 열린 협업과 AI 코딩의 가능성'
 ];
 
-const officialTimelineTitles = [
-  '00:02:08 칩의 역사: 독점 아래의 긴 일몰(芯片史：垄断之下漫长的日落)↗',
-  '01:17:32 무어의 법칙(摩尔定律)↗',
-  '01:31:45 18층 보탑(18层宝塔)↗',
-  '01:58:18 화웨이 어센드 역사와 중국의 길(华为昇腾史与中国道路)↗',
-  '03:21:29 인재와 컴퓨팅 파워(人才与算力)↗',
-  '03:39:23 AI와 칩 기술 최전선(AI与芯片的科技前沿)↗',
-  '04:16:45 엔지니어 이야기(工程师故事)↗'
-];
-
 const chapterTopicCounts = [6, 4, 6, 8, 3, 5, 3];
 const expectedTopicLabels = chapterTopicCounts.flatMap((count, chapterIndex) =>
   Array.from({ length: count }, (_, topicIndex) => `${chapterIndex + 1}-${topicIndex + 1}`)
@@ -160,7 +150,7 @@ test('반복 라벨은 제거하고 정보성 라벨과 marker 핵심 정보는 
   await expect.poll(() => page.locator('#topic-35').evaluate(element => element.getBoundingClientRect().top)).toBeLessThan(125);
 });
 
-test('확장 챕터 제목은 세 탐색 위치에서 일치하고 공식 타임라인 원제는 보존한다', async ({ page }) => {
+test('확장 챕터 제목은 세 탐색 위치에서 일치하고 제거된 공식 타임라인은 다시 나타나지 않는다', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const titles = await page.evaluate(() => {
     const withoutIndex = selector => [...document.querySelectorAll(selector)].map(element => {
@@ -171,14 +161,13 @@ test('확장 챕터 제목은 세 탐색 위치에서 일치하고 공식 타임
     return {
       rail: withoutIndex('.desktop-rail [data-nav-chapter]'),
       drawer: withoutIndex('#tocDrawer details > summary'),
-      body: [...document.querySelectorAll('.transcript-chapter .chapter-heading h2')].map(element => element.textContent.trim()),
-      timeline: [...document.querySelectorAll('#timeline li')].map(element => element.textContent.trim())
+      body: [...document.querySelectorAll('.transcript-chapter .chapter-heading h2')].map(element => element.textContent.trim())
     };
   });
   expect(titles.rail).toEqual(expandedChapterTitles);
   expect(titles.drawer).toEqual(expandedChapterTitles);
   expect(titles.body).toEqual(expandedChapterTitles);
-  expect(titles.timeline).toEqual(officialTimelineTitles);
+  await expect(page.locator('#timeline')).toHaveCount(0);
 });
 
 test('데스크톱 고정 헤더는 작은 사이트 타이틀 위·동적 장 제목 아래의 2줄 구조를 유지한다', async ({ page }) => {
@@ -1170,9 +1159,9 @@ for (const viewport of viewports) {
       );
       expect(badParagraphEndings).toBe(0);
       await expect(page.locator('.site-header')).toHaveCSS('position', 'fixed');
-      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(17, 20, 23)');
-      await expect(page.locator('.brand b')).toHaveCSS('color', 'rgb(114, 169, 166)');
-      await expect(page.locator('.chapter-index').first()).toHaveCSS('color', 'rgb(197, 164, 93)');
+      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(41, 44, 51)');
+      await expect(page.locator('.brand b')).toHaveCSS('color', 'rgb(97, 173, 171)');
+      await expect(page.locator('.chapter-index').first()).toHaveCSS('color', 'rgb(245, 204, 65)');
       const headerTitleSize = await page.locator('#readingStatus').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
       expect(headerTitleSize).toBeGreaterThanOrEqual(viewport.width < 1000 ? 14 : 15);
       const timestampSize = await page.locator('.paragraph-timestamp').first().evaluate(element => parseFloat(getComputedStyle(element).fontSize));
