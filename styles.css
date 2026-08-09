@@ -2,8 +2,8 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  /* Warm graphite paper: low-chroma ink, readable archival accents. */
-  --bg: #24221f; --panel: #2b2824; --panel-2: #34302b; --line: #514b43;
+  /* Cool neutral dark terminal: layered low-chroma backgrounds. */
+  --bg: #111417; --panel: #171b1f; --panel-2: #1d2328; --line: #343d44;
   --foreground: #ddd7cc; --bright-white: #f2ede3; --inactive: #9d978e;
   --ansi-cyan: #72a9a6; --ansi-bright-cyan: #8bbab5; --ansi-yellow: #c5a45d;
   --ansi-green: #7f9d84; --ansi-red: #bd7770;
@@ -22,7 +22,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .skip-link:focus { transform: none; }
 .progress { position: fixed; top: 0; inset-inline: 0; height: 2px; z-index: 110; background: var(--panel-2); }
 .progress span { display: block; width: 0; height: 100%; background: var(--ansi-green); box-shadow: 0 0 8px rgba(127,157,132,.22); transition: width .18s linear; }
-.site-header { position: fixed; top: 0; inset-inline: 0; z-index: 100; height: var(--header); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 max(18px, env(safe-area-inset-left)); background: rgba(43,40,36,.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(12px); }
+.site-header { position: fixed; top: 0; inset-inline: 0; z-index: 100; height: var(--header); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 max(18px, env(safe-area-inset-left)); background: rgba(23,27,31,.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(12px); }
 .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--foreground); font: 500 10px/1.25 "IBM Plex Mono", monospace; letter-spacing: .13em; }
 .brand b { color: var(--cyan); font-weight: 500; }
 .brand-mark { width: 18px; height: 18px; display: inline-block; border: 1px solid var(--cyan); border-radius: 50%; box-shadow: inset 0 0 0 4px var(--ink); background: var(--cyan); position: relative; flex: 0 0 auto; }

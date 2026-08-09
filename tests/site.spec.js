@@ -415,39 +415,79 @@ test('모바일 chapter summary는 chevron과 aria로 상태를 표시하며 44p
   expect(closedTransform).not.toBe(openState.transform);
 });
 
-test('warm graphite 테마, 실사용 최소 11px, 절제된 motion 계약을 지킨다', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/', { waitUntil: 'networkidle' });
-  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
-  await page.locator('#menuButton').click();
-  const contract = await page.evaluate(() => {
-    const root = getComputedStyle(document.documentElement);
-    const rgb = name => root.getPropertyValue(name).trim();
-    const selectors = ['.brand', '.header-status', '.kicker', '.hero-byline', '.hero-stats dt', '.source-button small', '.play', '.scroll-cue', '.chapter-index', '.paragraph-timestamp', '.highlight-time', '.toc-drawer details a span', '.back-to-top span', 'footer', '.footer-byline'];
-    const sizes = selectors.map(selector => ({ selector, size: parseFloat(getComputedStyle(document.querySelector(selector)).fontSize) }));
-    const drawerTransition = getComputedStyle(document.querySelector('.toc-drawer')).transitionDuration;
-    const summaryTransition = getComputedStyle(document.querySelector('.toc-drawer summary')).transitionDuration;
-    const luminance = hex => {
-      const channels = hex.match(/[\da-f]{2}/gi).map(channel => parseInt(channel, 16) / 255)
-        .map(channel => channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4);
-      return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2];
-    };
-    const contrast = (foreground, background) => {
-      const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
-      return (values[0] + .05) / (values[1] + .05);
-    };
-    const inactive = rgb('--inactive');
-    return {
-      colors: { bg: rgb('--bg'), panel: rgb('--panel'), panel2: rgb('--panel-2'), text: rgb('--foreground'), inactive, muted: rgb('--muted'), cyan: rgb('--ansi-cyan'), yellow: rgb('--ansi-yellow'), green: rgb('--ansi-green') },
-      inactiveContrast: [contrast(inactive, rgb('--panel')), contrast(inactive, rgb('--panel-2'))],
-      sizes, drawerTransition, summaryTransition
-    };
-  });
-  expect(contract.colors).toEqual({ bg: '#24221f', panel: '#2b2824', panel2: '#34302b', text: '#ddd7cc', inactive: '#9d978e', muted: '#aaa398', cyan: '#72a9a6', yellow: '#c5a45d', green: '#7f9d84' });
-  contract.inactiveContrast.forEach(ratio => expect(ratio).toBeGreaterThanOrEqual(4.5));
-  contract.sizes.forEach(({ selector, size }) => expect(size, selector).toBeGreaterThanOrEqual(11));
-  expect(contract.drawerTransition).toMatch(/0\.[12]\d*s/);
-  expect(contract.summaryTransition).toMatch(/0\.[12]\d*s/);
+test('cool neutral dark terminal 테마, 배경 층위, 대비와 기존 표시 계약을 지킨다', async ({ page }) => {
+  const expectedColors = {
+    bg: '#111417', panel: '#171b1f', panel2: '#1d2328', line: '#343d44',
+    foreground: '#ddd7cc', brightWhite: '#f2ede3', inactive: '#9d978e', muted: '#aaa398',
+    cyan: '#72a9a6', yellow: '#c5a45d', green: '#7f9d84', red: '#bd7770'
+  };
+  const expectedBackgrounds = {
+    body: 'rgb(17, 20, 23)', drawer: 'rgb(23, 27, 31)', rail: 'rgb(23, 27, 31)',
+    header: 'rgba(23, 27, 31, 0.94)'
+  };
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/', { waitUntil: 'networkidle' });
+    await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+    if (viewport.width === 390) await page.locator('#menuButton').click();
+
+    const contract = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const token = name => root.getPropertyValue(name).trim();
+      const selectors = ['.brand', '.header-status', '.kicker', '.hero-byline', '.hero-stats dt', '.source-button small', '.play', '.scroll-cue', '.chapter-index', '.paragraph-timestamp', '.highlight-time', '.toc-drawer details a span', '.back-to-top span', 'footer', '.footer-byline'];
+      const sizes = selectors.map(selector => ({ selector, size: parseFloat(getComputedStyle(document.querySelector(selector)).fontSize) }));
+      const luminance = hex => {
+        const channels = hex.match(/[\da-f]{2}/gi).map(channel => parseInt(channel, 16) / 255)
+          .map(channel => channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4);
+        return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2];
+      };
+      const contrast = (foreground, background) => {
+        const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+        return (values[0] + .05) / (values[1] + .05);
+      };
+      const colors = {
+        bg: token('--bg'), panel: token('--panel'), panel2: token('--panel-2'), line: token('--line'),
+        foreground: token('--foreground'), brightWhite: token('--bright-white'), inactive: token('--inactive'),
+        muted: token('--muted'), cyan: token('--ansi-cyan'), yellow: token('--ansi-yellow'),
+        green: token('--ansi-green'), red: token('--ansi-red')
+      };
+      return {
+        colors,
+        backgrounds: {
+          body: getComputedStyle(document.body).backgroundColor,
+          drawer: getComputedStyle(document.querySelector('.toc-drawer')).backgroundColor,
+          rail: getComputedStyle(document.querySelector('.desktop-rail')).backgroundColor,
+          header: getComputedStyle(document.querySelector('.site-header')).backgroundColor
+        },
+        layerLuminance: [colors.bg, colors.panel, colors.panel2].map(luminance),
+        blueAtLeastRed: [colors.bg, colors.panel, colors.panel2, colors.line].every(hex => parseInt(hex.slice(5, 7), 16) >= parseInt(hex.slice(1, 3), 16)),
+        contrast: {
+          foregroundBg: contrast(colors.foreground, colors.bg),
+          foregroundPanel: contrast(colors.foreground, colors.panel),
+          brightWhiteBg: contrast(colors.brightWhite, colors.bg)
+        },
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        sizes,
+        drawerTransition: getComputedStyle(document.querySelector('.toc-drawer')).transitionDuration,
+        summaryTransition: getComputedStyle(document.querySelector('.toc-drawer summary')).transitionDuration
+      };
+    });
+
+    expect(contract.colors).toEqual(expectedColors);
+    expect(contract.backgrounds.body).toBe(expectedBackgrounds.body);
+    expect(contract.backgrounds.header).toBe(expectedBackgrounds.header);
+    if (viewport.width === 390) expect(contract.backgrounds.drawer).toBe(expectedBackgrounds.drawer);
+    if (viewport.width === 1280) expect(contract.backgrounds.rail).toBe(expectedBackgrounds.rail);
+    expect(contract.blueAtLeastRed).toBeTruthy();
+    expect(contract.layerLuminance[0]).toBeLessThan(contract.layerLuminance[1]);
+    expect(contract.layerLuminance[1]).toBeLessThan(contract.layerLuminance[2]);
+    Object.values(contract.contrast).forEach(ratio => expect(ratio).toBeGreaterThanOrEqual(7));
+    expect(contract.horizontalOverflow).toBeLessThanOrEqual(0);
+    contract.sizes.forEach(({ selector, size }) => expect(size, selector).toBeGreaterThanOrEqual(11));
+    expect(contract.drawerTransition).toMatch(/0\.[12]\d*s/);
+    expect(contract.summaryTransition).toMatch(/0\.[12]\d*s/);
+  }
 });
 
 test('전사 타임스탬프는 본문 위의 독립 행이며 제목 위계가 분명하다', async ({ page }) => {
@@ -716,7 +756,7 @@ for (const viewport of viewports) {
       );
       expect(badParagraphEndings).toBe(0);
       await expect(page.locator('.site-header')).toHaveCSS('position', 'fixed');
-      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(36, 34, 31)');
+      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(17, 20, 23)');
       await expect(page.locator('.brand b')).toHaveCSS('color', 'rgb(114, 169, 166)');
       await expect(page.locator('.chapter-index').first()).toHaveCSS('color', 'rgb(197, 164, 93)');
       const headerTitleSize = await page.locator('#readingStatus').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
