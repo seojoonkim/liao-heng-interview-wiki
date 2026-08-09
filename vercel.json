@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true,
-  "trailingSlash": false
+  "redirects": [
+    {
+      "source": "/:path*",
+      "destination": "https://carrotcave.com/voices/liao-heng",
+      "permanent": true
+    }
+  ]
 }
