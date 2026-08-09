@@ -16,10 +16,10 @@ CSS = ROOT / "styles.css"
 JS = ROOT / "script.js"
 SOURCE_TRANSCRIPT = ROOT / "transcript.json"
 TRANSCRIPT = ROOT / "transcript-ko.json"
-OG_IMAGE = ROOT / "assets" / "og-liao-heng-right-type-v3.jpg"
-OG_LAYOUT = ROOT / "assets" / "og-liao-heng-right-type-v3.json"
+OG_IMAGE = ROOT / "assets" / "og-liao-heng-right-type-v4.jpg"
+OG_LAYOUT = ROOT / "assets" / "og-liao-heng-right-type-v4.json"
 SITE_URL = "https://liao-heng-interview-wiki.vercel.app/"
-OG_IMAGE_URL = f"{SITE_URL}assets/og-liao-heng-right-type-v3.jpg"
+OG_IMAGE_URL = f"{SITE_URL}assets/og-liao-heng-right-type-v4.jpg"
 SOCIAL_TITLE = "랴오헝 인터뷰 — 반도체 연구자의 필드 노트"
 SOCIAL_DESCRIPTION = "화웨이 반도체 수석과학자 랴오헝의 4시간 38분 인터뷰를 7개 장, 35개 중요 지점, 전체 한국어 번역 전사로 읽는 필드 노트."
 OG_IMAGE_ALT = "랴오헝 인터뷰 필드 노트 — 랴오헝 사진과 7개 장·35개 중요 지점 안내"
@@ -174,7 +174,7 @@ try:
     require(layout.get("face_text_gap", 0) >= 200, "OG 얼굴과 텍스트 안전영역 사이에 200px 이상 간격이 필요함")
     require(layout.get("gradient_opaque_until_x", 0) >= 450, "OG 왼쪽 불투명 그라데이션 범위가 부족함")
     require(layout.get("required_label") == "화웨이 반도체 수석과학자", "OG 인물 설명 계약 오류")
-    require(layout.get("font_sizes") == [31, 78, 34, 34, 21], "OG 전체 글자 크기 확대 계약 오류")
+    require(layout.get("font_sizes") == [33, 82, 36, 36, 22], "OG 전체 글자 크기 확대 계약 오류")
     require(layout.get("text_max_right", 9999) <= layout.get("text_safe_right", 0), "OG 확대 텍스트가 안전영역을 벗어남")
     require(layout.get("text_max_bottom", 9999) <= 570, "OG 확대 텍스트가 하단 안전영역을 벗어남")
 except Exception as exc:
