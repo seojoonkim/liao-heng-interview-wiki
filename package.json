@@ -5,6 +5,7 @@
   "description": "랴오헝 인터뷰를 7개 장과 35개 주제로 정리한 정적 웹 위키",
   "scripts": {
     "serve": "python3 -m http.server 4173 --bind 127.0.0.1",
+    "build:social": "python3 scripts/build_social_card.py",
     "validate:social": "python3 scripts/validate.py --social-only",
     "validate": "python3 scripts/validate.py && node --check script.js",
     "test:browser": "playwright test",
