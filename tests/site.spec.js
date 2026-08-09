@@ -572,41 +572,114 @@ test('Antigravity dark 기반 테마, 배경 층위, 대비와 기존 표시 계
   }
 });
 
-test('35개 중요 지점의 첫 본문 문단만 절제된 인라인 하이라이트로 표시한다', async ({ page }) => {
+test('승인 문장만 원문을 보존한 채 노란 글자색으로 정확히 강조한다', async ({ page, request }) => {
+  const editorialResponse = await request.get('/key-sentences.json');
+  expect(editorialResponse.ok()).toBeTruthy();
+  const approved = await editorialResponse.json();
+  const transcriptResponse = await request.get('/transcript-ko.json');
+  expect(transcriptResponse.ok()).toBeTruthy();
+  const transcriptData = await transcriptResponse.json();
+  expect(approved).toHaveLength(24);
+
   for (const viewport of viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/#topic-20', { waitUntil: 'networkidle' });
     await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
 
-    const result = await page.evaluate(() => {
-      const marked = [...document.querySelectorAll('.key-paragraph')];
-      const markerPairs = [...document.querySelectorAll('.highlight-marker')].map(marker => marker.nextElementSibling?.classList.contains('key-paragraph'));
-      const sample = marked[0];
-      const style = getComputedStyle(sample);
+    const result = await page.evaluate(items => {
+      const marks = [...document.querySelectorAll('mark.key-sentence')];
+      const representativeItems = [items[0], items[Math.floor(items.length / 2)], items.at(-1)];
       return {
-        count: marked.length,
-        allFollowMarkers: markerPairs.every(Boolean),
-        otherHighlightedCount: document.querySelectorAll('.transcript-paragraph.highlighted:not(.key-paragraph)').length,
-        borderLeftWidth: parseFloat(style.borderLeftWidth),
-        borderLeftColor: style.borderLeftColor,
-        backgroundImage: style.backgroundImage,
-        paddingLeft: parseFloat(style.paddingLeft),
-        textColor: style.color,
-        fullyVisible: marked.every(paragraph => paragraph.scrollWidth <= paragraph.clientWidth + 1),
+        keyParagraphCount: document.querySelectorAll('.key-paragraph').length,
+        markCount: marks.length,
+        allInsideParagraphText: marks.every(mark => mark.parentElement?.classList.contains('paragraph-text')),
+        markTexts: marks.map(mark => mark.textContent),
+        styles: marks.map(mark => {
+          const style = getComputedStyle(mark);
+          return {
+            color: style.color,
+            backgroundColor: style.backgroundColor,
+            padding: style.padding,
+            font: style.font,
+            parentFont: getComputedStyle(mark.parentElement).font
+          };
+        }),
+        paragraphStyles: representativeItems.map(item => {
+          const paragraph = document.querySelector(`#segment-${item.segmentStartId}`)?.closest('.transcript-paragraph');
+          const style = getComputedStyle(paragraph);
+          return {
+            borderLeftWidth: style.borderLeftWidth,
+            backgroundImage: style.backgroundImage,
+            paddingLeft: style.paddingLeft,
+            paddingRight: style.paddingRight
+          };
+        }),
+        paragraphTexts: items.map(item => document.querySelector(`#segment-${item.segmentStartId}`)?.closest('.transcript-paragraph')?.querySelector('.paragraph-text')?.textContent),
         horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
       };
-    });
+    }, approved);
 
-    expect(result.count).toBe(35);
-    expect(result.allFollowMarkers).toBeTruthy();
-    expect(result.otherHighlightedCount).toBeGreaterThan(0);
-    expect(result.borderLeftWidth).toBe(2);
-    expect(result.borderLeftColor).toBe('rgb(245, 204, 65)');
-    expect(result.backgroundImage).not.toBe('none');
-    expect(result.paddingLeft).toBeGreaterThanOrEqual(14);
-    expect(result.textColor).toBe('rgb(255, 255, 255)');
-    expect(result.fullyVisible).toBeTruthy();
+    const originalParagraphTexts = approved.map(item =>
+      transcriptData.paragraphs.find(paragraph => paragraph.segmentStartId === item.segmentStartId)?.text
+    );
+    expect(result.keyParagraphCount).toBe(0);
+    expect(result.markCount).toBe(approved.length);
+    expect(result.allInsideParagraphText).toBeTruthy();
+    expect(result.markTexts).toEqual(approved.map(item => item.exact_quote));
+    result.styles.forEach(style => {
+      expect(style.color).toBe('rgb(245, 204, 65)');
+      expect(style.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+      expect(style.padding).toBe('0px');
+      expect(style.font).toBe(style.parentFont);
+    });
+    result.paragraphStyles.forEach(style => {
+      expect(style.borderLeftWidth).toBe('0px');
+      expect(style.backgroundImage).toBe('none');
+      expect(style.paddingLeft).toBe('0px');
+      expect(style.paddingRight).toBe('0px');
+    });
+    expect(result.paragraphTexts).toEqual(originalParagraphTexts);
     expect(result.horizontalOverflow).toBeLessThanOrEqual(0);
+  }
+});
+
+test('유효하지 않은 핵심 문장 데이터는 하이라이트 없이 fail-closed 처리한다', async ({ page, request }) => {
+  const editorialResponse = await request.get('/key-sentences.json');
+  expect(editorialResponse.ok()).toBeTruthy();
+  const approved = await editorialResponse.json();
+  const expectedConsoleErrors = [];
+  page.on('console', message => {
+    if (message.type() === 'error') expectedConsoleErrors.push(message.text());
+  });
+
+  const invalidCases = [
+    {
+      name: '존재하지 않는 exact_quote',
+      data: [{ ...approved[0], exact_quote: `${approved[0].exact_quote} 존재하지 않는 문장` }],
+      error: /Key sentence must match exactly once/
+    },
+    {
+      name: '중복되어 겹치는 exact_quote',
+      data: [approved[0], { ...approved[0] }],
+      error: /Overlapping key sentences/
+    }
+  ];
+
+  for (const invalidCase of invalidCases) {
+    expectedConsoleErrors.length = 0;
+    await page.route('**/key-sentences.json', route => route.fulfill({ json: invalidCase.data }));
+    await page.goto('/', { waitUntil: 'networkidle' });
+
+    await expect(page.locator('#transcriptError'), invalidCase.name).toBeVisible();
+    const state = await page.locator('#transcript').evaluate(element => ({
+      busy: element.getAttribute('aria-busy'),
+      errorVisible: !document.querySelector('#transcriptError').hidden
+    }));
+    expect(state.busy === 'true' || state.errorVisible, invalidCase.name).toBeTruthy();
+    await expect(page.locator('mark.key-sentence'), invalidCase.name).toHaveCount(0);
+    expect(expectedConsoleErrors.some(message => invalidCase.error.test(message)), invalidCase.name).toBeTruthy();
+
+    await page.unroute('**/key-sentences.json');
   }
 });
 

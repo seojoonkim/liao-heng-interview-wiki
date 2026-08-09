@@ -243,7 +243,21 @@
     return marker;
   };
 
-  const renderGroup = (paragraphs, segmentsById, container, highlights) => {
+  const appendParagraphText = (container, paragraphData, keySentences) => {
+    const matches = keySentences.get(Number(paragraphData.segmentStartId)) || [];
+    let cursor = 0;
+    matches.forEach(({ exact_quote: quote, start }) => {
+      container.append(document.createTextNode(paragraphData.text.slice(cursor, start)));
+      const mark = document.createElement('mark');
+      mark.className = 'key-sentence';
+      mark.textContent = quote;
+      container.append(mark);
+      cursor = start + quote.length;
+    });
+    container.append(document.createTextNode(paragraphData.text.slice(cursor)));
+  };
+
+  const renderGroup = (paragraphs, segmentsById, container, highlights, keySentences) => {
     const fragment = document.createDocumentFragment();
     const highlightsBySegment = new Map();
     highlights.forEach(highlight => {
@@ -263,7 +277,6 @@
       }
       const paragraph = document.createElement('p');
       paragraph.className = 'transcript-paragraph';
-      if (markerData) paragraph.classList.add('key-paragraph');
       paragraph.dataset.start = String(paragraphData.start);
       paragraph.dataset.end = String(paragraphData.end);
       if (!activeHighlight || Number(paragraphData.start) >= Number(activeHighlight.end)) {
@@ -281,20 +294,41 @@
       }
       const text = document.createElement('span');
       text.className = 'paragraph-text';
-      text.textContent = paragraphData.text || '';
+      appendParagraphText(text, paragraphData, keySentences);
       paragraph.append(text);
       fragment.append(paragraph);
     });
     container.append(fragment);
   };
 
-  const renderTranscript = data => {
+  const renderTranscript = (data, editorialData) => {
     if (!data || !Array.isArray(data.segments) || !Array.isArray(data.paragraphs) || !Array.isArray(data.chapters) || !Array.isArray(data.highlights)) {
       throw new Error('Invalid transcript data');
     }
     if (data.segments.length !== 8142 || data.paragraphs.length <= 100 || data.highlights.length !== 35 || data.chapters.length !== 7) {
       throw new Error('Unexpected transcript metadata counts');
     }
+    if (!Array.isArray(editorialData)) throw new Error('Invalid key sentence data');
+
+    const keySentences = new Map();
+    editorialData.forEach((item, index) => {
+      if (!Number.isInteger(item.segmentStartId) || typeof item.exact_quote !== 'string' || !item.exact_quote) {
+        throw new Error(`Invalid key sentence item ${index}`);
+      }
+      const paragraph = data.paragraphs.find(candidate => Number(candidate.segmentStartId) === item.segmentStartId);
+      if (!paragraph) throw new Error(`Key sentence paragraph not found: ${item.segmentStartId}`);
+      const first = paragraph.text.indexOf(item.exact_quote);
+      const occurrences = first < 0 ? 0 : paragraph.text.split(item.exact_quote).length - 1;
+      if (occurrences !== 1) throw new Error(`Key sentence must match exactly once: ${item.segmentStartId} (${occurrences})`);
+      const matches = keySentences.get(item.segmentStartId) || [];
+      const end = first + item.exact_quote.length;
+      if (matches.some(match => first < match.end && end > match.start)) {
+        throw new Error(`Overlapping key sentences: ${item.segmentStartId}`);
+      }
+      matches.push({ ...item, start: first, end });
+      matches.sort((a, b) => a.start - b.start);
+      keySentences.set(item.segmentStartId, matches);
+    });
 
     document.querySelectorAll('.transcript-topic-anchor').forEach(anchor => {
       anchor.removeAttribute('id');
@@ -306,19 +340,20 @@
 
     const firstChapterSegment = Number(data.chapters[0].segmentStartId);
     const intro = data.paragraphs.filter(paragraph => Number(paragraph.segmentStartId) < firstChapterSegment);
-    renderGroup(intro, segmentsById, document.querySelector('[data-transcript-intro]'), []);
+    renderGroup(intro, segmentsById, document.querySelector('[data-transcript-intro]'), [], keySentences);
 
     data.chapters.forEach((chapter, chapterIndex) => {
       const nextStartId = Number(data.chapters[chapterIndex + 1]?.segmentStartId ?? data.segments.length);
       const chapterParagraphs = data.paragraphs.filter(paragraph => Number(paragraph.segmentStartId) >= Number(chapter.segmentStartId) && Number(paragraph.segmentStartId) < nextStartId);
       const container = document.querySelector(`[data-transcript-chapter="${chapter.id}"]`);
-      renderGroup(chapterParagraphs, segmentsById, container, data.highlights.filter(item => Number(item.chapter) === Number(chapter.id)));
+      renderGroup(chapterParagraphs, segmentsById, container, data.highlights.filter(item => Number(item.chapter) === Number(chapter.id)), keySentences);
     });
 
     const segmentCount = document.querySelectorAll('.segment-anchor').length;
     const markerCount = document.querySelectorAll('.highlight-marker').length;
     const populatedChapters = [...document.querySelectorAll('[data-transcript-chapter]')].filter(element => element.children.length > 0).length;
-    if (segmentCount !== 8142 || markerCount !== 35 || populatedChapters !== 7) {
+    const keySentenceCount = document.querySelectorAll('.key-sentence').length;
+    if (segmentCount !== 8142 || markerCount !== 35 || populatedChapters !== 7 || keySentenceCount !== editorialData.length) {
       throw new Error(`Render verification failed: ${segmentCount} segments, ${markerCount} markers, ${populatedChapters} chapters`);
     }
 
@@ -411,12 +446,11 @@
   backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' }));
   updateProgress();
 
-  fetch('transcript-ko.json')
-    .then(response => {
-      if (!response.ok) throw new Error(`Transcript request failed (${response.status})`);
-      return response.json();
-    })
-    .then(renderTranscript)
+  Promise.all(['transcript-ko.json', 'key-sentences.json'].map(url => fetch(url).then(response => {
+    if (!response.ok) throw new Error(`${url} request failed (${response.status})`);
+    return response.json();
+  })))
+    .then(([data, editorialData]) => renderTranscript(data, editorialData))
     .catch(reason => {
       console.error(reason);
       loading.hidden = true;
