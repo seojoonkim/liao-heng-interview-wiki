@@ -33,6 +33,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .header-status { min-width: 0; display: flex; align-items: center; gap: 7px; color: var(--muted); font: 10px "IBM Plex Mono", monospace; letter-spacing: .06em; white-space: nowrap; overflow: hidden; }
 .header-titles { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; overflow: hidden; }
 .header-site-title { color: var(--cyan); font: 500 11px/1.1 var(--font-sans); letter-spacing: .02em; }
+.header-mobile-title { display:none; }
 .header-status #readingStatus { min-width:0; overflow:hidden; color:var(--bright-white); font:700 17px/1.2 var(--font-sans); letter-spacing:-.02em; text-overflow:ellipsis; }
 .header-status i { display: inline-block; width: 5px; height: 5px; margin-right: 7px; border-radius: 50%; background: var(--ansi-green); }
 .menu-button { min-width: 60px; min-height: 44px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 0; border: 0; color: var(--bright-white); background: none; font: 500 11px "IBM Plex Mono", monospace; letter-spacing: .12em; }
@@ -119,15 +120,17 @@ body.drawer-open{overflow:hidden}
 .menu-button,.segment-timestamp.paragraph-timestamp,.highlight-index { font-size:12px; }
 .chapter-index { font-size:14px; }
 
+@media (max-width:999px) {
+  .brand, .header-status i, #currentChapterNumber, .header-site-title { display:none; }
+  .header-status { flex:1 1 auto; }
+  .header-mobile-title { display:block; overflow:hidden; color:var(--cyan); font:500 12px/1.1 var(--font-sans); letter-spacing:.01em; text-overflow:ellipsis; }
+  .header-titles { flex:1 1 auto; }
+}
+
 @media (max-width:599px) {
   .site-header { gap: 8px; padding-inline: 13px; }
-  .brand { flex: 0 0 auto; }
-  .brand > span:last-child { display: none; }
   .header-status { flex: 1 1 auto; font-size: 11px; }
-  .header-titles { flex: 1 1 auto; }
   .header-status #readingStatus { min-width:0; font-size:16px; }
-  .header-status i { margin-right: 0; }
-  #currentChapterNumber { flex: 0 0 auto; color: var(--foreground); }
   .menu-button { flex: 0 0 44px; min-width: 44px; width: 44px; min-height: 44px; justify-content: center; }
   .menu-button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .chapter-heading h2 { font-size:34px; line-height:1.22; margin-bottom:18px; }

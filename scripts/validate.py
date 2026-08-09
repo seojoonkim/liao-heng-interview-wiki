@@ -4,6 +4,7 @@ from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
+from PIL import Image
 import json
 import math
 import re
@@ -15,6 +16,12 @@ CSS = ROOT / "styles.css"
 JS = ROOT / "script.js"
 SOURCE_TRANSCRIPT = ROOT / "transcript.json"
 TRANSCRIPT = ROOT / "transcript-ko.json"
+OG_IMAGE = ROOT / "assets" / "og-liao-heng.jpg"
+SITE_URL = "https://liao-heng-interview-wiki.vercel.app/"
+OG_IMAGE_URL = f"{SITE_URL}assets/og-liao-heng.jpg"
+SOCIAL_TITLE = "랴오헝 인터뷰 — 반도체 연구자의 필드 노트"
+SOCIAL_DESCRIPTION = "화웨이 반도체 수석과학자 랴오헝의 4시간 38분 인터뷰를 7개 장, 35개 중요 지점, 전체 한국어 번역 전사로 읽는 필드 노트."
+OG_IMAGE_ALT = "랴오헝 인터뷰 필드 노트 — 랴오헝 사진과 7개 장·35개 중요 지점 안내"
 errors = []
 
 
@@ -32,6 +39,8 @@ class DocumentParser(HTMLParser):
         self.hrefs = []
         self.scripts = []
         self.stylesheets = []
+        self.metadata = []
+        self.links = []
         self.stack = []
 
     def handle_decl(self, decl):
@@ -47,6 +56,12 @@ class DocumentParser(HTMLParser):
             self.scripts.append(values["src"])
         if tag == "link" and "stylesheet" in values.get("rel", "").split() and values.get("href"):
             self.stylesheets.append(values["href"])
+        if tag == "meta" and values.get("content") is not None:
+            key = values.get("property") or values.get("name")
+            if key:
+                self.metadata.append((key, values["content"]))
+        if tag == "link":
+            self.links.append(values)
         if tag not in self.VOID:
             self.stack.append(tag)
 
@@ -113,6 +128,43 @@ except Exception as exc:
 
 require(html.lstrip().lower().startswith("<!doctype html>"), "HTML5 doctype 누락")
 require(not parser.stack, f"닫히지 않은 HTML 태그: {parser.stack}")
+metadata = dict(parser.metadata)
+metadata_counts = Counter(key for key, _ in parser.metadata)
+expected_metadata = {
+    "description": SOCIAL_DESCRIPTION,
+    "theme-color": "#292c33",
+    "og:type": "article",
+    "og:site_name": "랴오헝 인터뷰 위키",
+    "og:title": SOCIAL_TITLE,
+    "og:description": SOCIAL_DESCRIPTION,
+    "og:url": SITE_URL,
+    "og:locale": "ko_KR",
+    "og:image": OG_IMAGE_URL,
+    "og:image:secure_url": OG_IMAGE_URL,
+    "og:image:width": "1200",
+    "og:image:height": "630",
+    "og:image:type": "image/jpeg",
+    "og:image:alt": OG_IMAGE_ALT,
+    "twitter:card": "summary_large_image",
+    "twitter:title": SOCIAL_TITLE,
+    "twitter:description": SOCIAL_DESCRIPTION,
+    "twitter:image": OG_IMAGE_URL,
+    "twitter:image:alt": OG_IMAGE_ALT,
+}
+for key, value in expected_metadata.items():
+    require(metadata_counts[key] == 1, f"소셜 메타 {key}는 원본 HTML head에 정확히 1회여야 함")
+    require(metadata.get(key) == value, f"소셜 메타 {key} 값 오류")
+canonicals = [link.get("href") for link in parser.links if "canonical" in link.get("rel", "").split()]
+require(canonicals == [SITE_URL], "canonical URL은 원본 HTML head에 정확히 지정되어야 함")
+require(f"<title>{SOCIAL_TITLE}</title>" in html, "문서 title 오류")
+try:
+    with Image.open(OG_IMAGE) as image:
+        require(image.format == "JPEG", f"OG 이미지는 JPEG여야 함: {image.format}")
+        require(image.size == (1200, 630), f"OG 이미지 크기는 1200×630이어야 함: {image.size}")
+        require(image.mode == "RGB", f"OG 이미지는 RGB여야 함: {image.mode}")
+except Exception as exc:
+    errors.append(f"OG 이미지 검사 실패: {exc}")
+require(OG_IMAGE.is_file() and OG_IMAGE.stat().st_size <= 500_000, "OG 이미지는 존재하며 500KB 이하여야 함")
 id_counts = Counter(parser.ids)
 duplicates = sorted(value for value, count in id_counts.items() if count > 1)
 require(not duplicates, f"중복 id: {duplicates}")
@@ -225,3 +277,5 @@ print("- 전체 한국어 번역 전사: 8,142개 구간, language=ko, sourceLan
 print(f"- 내부 href: {len(anchors)}개, 누락 대상 0개")
 print("- 공식 타임라인 섹션: 제거됨")
 print("- HTML 파싱/CSS 균형/로컬 자산: 정상")
+print("- canonical/Open Graph/Twitter 원본 HTML 메타: 정상")
+print("- OG 이미지: JPEG, RGB, 1200×630, 500KB 이하")

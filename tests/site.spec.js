@@ -181,8 +181,8 @@ test('확장 챕터 제목은 세 탐색 위치에서 일치하고 공식 타임
   expect(titles.timeline).toEqual(officialTimelineTitles);
 });
 
-test('고정 헤더는 작은 사이트 타이틀 위·동적 장 제목 아래의 2줄 구조를 유지한다', async ({ page }) => {
-  for (const viewport of viewports) {
+test('데스크톱 고정 헤더는 작은 사이트 타이틀 위·동적 장 제목 아래의 2줄 구조를 유지한다', async ({ page }) => {
+  for (const viewport of viewports.filter(viewport => viewport.width >= 1000)) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/#chapter-1', { waitUntil: 'networkidle' });
     await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
@@ -236,6 +236,85 @@ test('고정 헤더는 작은 사이트 타이틀 위·동적 장 제목 아래�
       await page.locator('#closeDrawer').click();
     }
   }
+});
+
+test('모바일 헤더는 브랜드 장식을 제거하고 현재 장 라벨과 긴 제목에 2줄 전체 폭을 제공한다', async ({ page }) => {
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/#chapter-1', { waitUntil: 'networkidle' });
+    await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+    const header = page.locator('.site-header');
+    const mobileTitle = header.locator('.header-mobile-title');
+    const chapterTitle = header.locator('#readingStatus');
+    await expect(mobileTitle).toHaveText('랴오헝 인터뷰: Chapter 01');
+    await expect(chapterTitle).toHaveText(expandedChapterTitles[0]);
+
+    const chapterFour = page.locator('#chapter-4');
+    await chapterFour.evaluate(element => window.scrollTo(0, window.scrollY + element.getBoundingClientRect().top - 90));
+    await expect(mobileTitle).toHaveText('랴오헝 인터뷰: Chapter 04');
+    await expect(chapterTitle).toHaveText(expandedChapterTitles[3]);
+
+    const geometry = await header.evaluate(element => {
+      const box = selector => element.querySelector(selector).getBoundingClientRect();
+      const style = selector => getComputedStyle(element.querySelector(selector));
+      const titles = box('.header-titles');
+      const first = box('.header-mobile-title');
+      const second = box('#readingStatus');
+      const menu = box('#menuButton');
+      const progress = box('#chapterProgress');
+      return {
+        brandDisplay: style('.brand').display,
+        dotDisplay: style('.header-status i').display,
+        numberDisplay: style('#currentChapterNumber').display,
+        desktopTitleDisplay: style('.header-site-title').display,
+        left: titles.left,
+        rightBeforeMenu: titles.right <= menu.left + 1,
+        width: titles.width,
+        ordered: first.bottom <= second.top + 1,
+        overlap: first.bottom > second.top + 1,
+        secondOneLine: second.height <= parseFloat(style('#readingStatus').lineHeight) + 1,
+        progressHeight: progress.height,
+        progressAtBottom: Math.abs(progress.bottom - element.getBoundingClientRect().bottom) <= 1,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+      };
+    });
+    expect(geometry.brandDisplay).toBe('none');
+    expect(geometry.dotDisplay).toBe('none');
+    expect(geometry.numberDisplay).toBe('none');
+    expect(geometry.desktopTitleDisplay).toBe('none');
+    expect(geometry.left).toBeLessThanOrEqual(18);
+    expect(geometry.rightBeforeMenu).toBeTruthy();
+    expect(geometry.width).toBeGreaterThanOrEqual(width === 390 ? 270 : 200);
+    expect(geometry.ordered).toBeTruthy();
+    expect(geometry.overlap).toBeFalsy();
+    expect(geometry.secondOneLine).toBeTruthy();
+    expect(geometry.progressHeight).toBe(3);
+    expect(geometry.progressAtBottom).toBeTruthy();
+    expect(geometry.overflow).toBeLessThanOrEqual(0);
+
+    await page.locator('#menuButton').click();
+    await expect(page.locator('#tocDrawer')).toBeVisible();
+    await expect(page.locator('#menuButton')).toHaveAttribute('aria-expanded', 'true');
+    await page.locator('#closeDrawer').click();
+  }
+});
+
+test('헤더의 Overview 모바일 라벨과 데스크톱 기존 구조를 보존한다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await expect(page.locator('.header-mobile-title')).toHaveText('랴오헝 인터뷰: Overview');
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/#chapter-4', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.brand')).toBeVisible();
+  await expect(page.locator('.header-status i')).toBeVisible();
+  await expect(page.locator('#currentChapterNumber')).toBeVisible();
+  await expect(page.locator('.header-site-title')).toBeVisible();
+  await expect(page.locator('.header-site-title')).toHaveText('랴오헝 인터뷰');
+  await expect(page.locator('.header-mobile-title')).toBeHidden();
+  await expect(page.locator('#currentChapterNumber')).toHaveText('CH 04');
+  await expect(page.locator('#readingStatus')).toHaveText(expandedChapterTitles[3]);
 });
 
 test('헤더 진행 바는 현재 장의 reading line 기준 진행률·ARIA·geometry를 390px·1280px에서 반영한다', async ({ page }) => {
@@ -323,7 +402,7 @@ test('헤더 진행 바는 감소 모션에서 transition과 animation을 완전
   expect(motion.animationName).toBe('none');
 });
 
-test('확장 제목은 390px 헤더에서 말줄임되고 목차·본문에서는 전체 줄바꿈된다', async ({ page }) => {
+test('확장 제목은 390px 헤더에서 한 줄 말줄임 범위를 지키고 목차·본문에서는 전체 줄바꿈된다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/#chapter-4', { waitUntil: 'networkidle' });
   await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
@@ -333,10 +412,10 @@ test('확장 제목은 390px 헤더에서 말줄임되고 목차·본문에서�
     return {
       textOverflow: style.textOverflow,
       oneLine: element.getBoundingClientRect().height <= parseFloat(style.lineHeight) + 1,
-      clipped: element.scrollWidth > element.clientWidth
+      contained: element.getBoundingClientRect().right <= document.querySelector('#menuButton').getBoundingClientRect().left + 1
     };
   });
-  expect(header).toEqual({ textOverflow: 'ellipsis', oneLine: true, clipped: true });
+  expect(header).toEqual({ textOverflow: 'ellipsis', oneLine: true, contained: true });
 
   await page.locator('#menuButton').click();
   const drawerSummary = page.locator('#tocDrawer details > summary').nth(3);

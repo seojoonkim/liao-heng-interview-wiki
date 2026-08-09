@@ -14,6 +14,7 @@
   const railPercent = document.getElementById('railPercent');
   const backToTop = document.getElementById('backToTop');
   const chapterNumber = document.getElementById('currentChapterNumber');
+  const mobileHeaderTitle = document.querySelector('.header-mobile-title');
   const readingStatus = document.getElementById('readingStatus');
   const chapterProgress = document.getElementById('chapterProgress');
   const chapterProgressFill = document.getElementById('chapterProgressFill');
@@ -427,6 +428,7 @@
     }
     if (!currentChapter || transcript.getBoundingClientRect().top > probe) {
       chapterNumber.textContent = '00';
+      mobileHeaderTitle.textContent = '랴오헝 인터뷰: Overview';
       readingStatus.textContent = 'OVERVIEW';
       activeChapter = null;
       activeTopic = null;
@@ -440,6 +442,7 @@
     const number = currentChapter.dataset.chapter;
     activeChapter = number;
     chapterNumber.textContent = `CH ${String(number).padStart(2, '0')}`;
+    mobileHeaderTitle.textContent = `랴오헝 인터뷰: Chapter ${String(number).padStart(2, '0')}`;
     readingStatus.textContent = currentChapter.querySelector('.chapter-heading h2')?.textContent || '';
     setActiveLinks('[data-nav-chapter]', 'navChapter', number);
     renderRailTopics(number);
