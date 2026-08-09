@@ -59,6 +59,8 @@ test('히어로 랴오헝 사진은 로컬 공식 출처와 접근성·반응형
     await expect(source).toHaveAttribute('href', 'https://www.bilibili.com/video/BV1nB3u6tERu/');
     await expect(figure.locator('.hero-nameplate')).toHaveText('랴오헝');
     await expect(figure.locator('figcaption')).toHaveText('Bilibili 인터뷰 장면 · 랴오헝');
+    await expect(page.locator('.hero-deck')).toContainText('화웨이 반도체 수석과학자');
+    await expect(page.locator('.hero-deck')).toContainText('어센드 AI 칩 개발');
 
     const geometry = await page.evaluate(() => {
       const box = selector => document.querySelector(selector).getBoundingClientRect();
