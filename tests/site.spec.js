@@ -476,6 +476,24 @@ test('모바일 chapter summary는 chevron과 aria로 상태를 표시하며 44p
   expect(closedTransform).not.toBe(openState.transform);
 });
 
+test('전체 요약은 구분선과 장식 다이아몬드 없이 포멀한 번호 목록을 사용한다', async ({ page }) => {
+  await page.goto('/', { waitUntil: 'networkidle' });
+  const summaryList = page.locator('#summary > ol');
+  const firstItem = summaryList.locator('li').first();
+
+  await expect(summaryList).toBeVisible();
+  await expect(summaryList.locator('li')).toHaveCount(8);
+
+  const style = await firstItem.evaluate(element => ({
+    listStyleType: getComputedStyle(element).listStyleType,
+    borderTopStyle: getComputedStyle(element).borderTopStyle,
+    beforeContent: getComputedStyle(element, '::before').content
+  }));
+  expect(style.listStyleType).toBe('decimal-leading-zero');
+  expect(style.borderTopStyle).toBe('none');
+  expect(style.beforeContent).toBe('none');
+});
+
 test('cool neutral dark terminal 테마, 배경 층위, 대비와 기존 표시 계약을 지킨다', async ({ page }) => {
   const expectedColors = {
     bg: '#111417', panel: '#171b1f', panel2: '#1d2328', line: '#343d44',
