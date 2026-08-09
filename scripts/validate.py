@@ -128,12 +128,8 @@ anchors = [href[1:] for href in parser.hrefs if href.startswith("#") and len(hre
 missing = sorted(set(anchors) - set(parser.ids))
 require(not missing, f"대상이 없는 내부 앵커: {missing}")
 
-timestamps = []
-for href in parser.hrefs:
-    parsed = urlsplit(href)
-    if "bilibili.com" in parsed.netloc.lower() and re.search(r"(?:^|&)t=\d+(?:&|$)", parsed.query):
-        timestamps.append(href)
-require(len(timestamps) >= 7, f"공식 장 타임스탬프 링크 부족: {len(timestamps)}개")
+require(id_counts["timeline"] == 0, "공식 타임라인 섹션이 남아 있음")
+require("공식 타임라인" not in html, "공식 타임라인 제목이 남아 있음")
 
 try:
     transcript = json.loads(TRANSCRIPT.read_text(encoding="utf-8"))
@@ -227,5 +223,5 @@ print("- 중요 지점: 35개 (topic-1~35, 각각 1회)")
 print("- 장: 7개 (chapter-1~7, 각각 1회)")
 print("- 전체 한국어 번역 전사: 8,142개 구간, language=ko, sourceLanguage=zh, 번역 누락 0개")
 print(f"- 내부 href: {len(anchors)}개, 누락 대상 0개")
-print(f"- 공식 장 Bilibili 타임스탬프: {len(timestamps)}개")
+print("- 공식 타임라인 섹션: 제거됨")
 print("- HTML 파싱/CSS 균형/로컬 자산: 정상")

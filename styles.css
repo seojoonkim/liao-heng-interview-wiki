@@ -60,7 +60,7 @@ h1 em { color:var(--cyan); font-style:normal; } h1 span { color:var(--foreground
 .content-column { max-width:var(--measure); margin:auto; }
 .content-section { padding:65px 0; border-bottom:1px solid var(--line); }
 .section-heading { margin-bottom:29px; }.section-heading h2 { margin:0; color:var(--bright-white); font:750 clamp(34px, 6vw, 42px)/1.22 var(--font-sans); letter-spacing:-.045em; overflow-wrap:anywhere; }
-.summary-block { margin-top:20px; }.summary-block ol { padding:0; margin:0; list-style:decimal-leading-zero inside; }.summary-block li { padding:13px 0; color:var(--foreground); font:400 17px/1.85 var(--font-sans); }.summary-block li::marker { color:var(--inactive); font:500 12px "IBM Plex Mono",monospace; }
+.summary-block { margin-top:20px; }.summary-block ul { padding:0 0 0 1.1em; margin:0; list-style:disc outside; }.summary-block li { padding:13px 0 13px 3px; color:var(--foreground); font:400 17px/1.85 var(--font-sans); }.summary-block li::marker { color:var(--inactive); font-size:.72em; }
 .chapter-heading { margin-bottom: 0; }.chapter-index { color:var(--amber); font:10px "IBM Plex Mono",monospace; letter-spacing:.18em; }.chapter-heading h2 { max-width:620px; margin:9px 0 22px; color:var(--bright-white); font:750 clamp(34px, 5.5vw, 46px)/1.22 var(--font-sans); letter-spacing:-.045em; text-wrap:balance; overflow-wrap:anywhere; }.chapter-line { display:block; width:100%; height:1px; background:var(--line); }.chapter-line::before { content:""; display:block; width:52px; height:1px; background:var(--cyan); }
 .chapter-summary { padding:21px 0 23px; border-bottom:1px solid var(--line); }
 .chapter-summary p { max-width:540px; margin:0; color:var(--foreground); font:400 16px/1.82 var(--font-sans); letter-spacing:-.006em; }

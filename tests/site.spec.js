@@ -476,20 +476,22 @@ test('모바일 chapter summary는 chevron과 aria로 상태를 표시하며 44p
   expect(closedTransform).not.toBe(openState.transform);
 });
 
-test('전체 요약은 구분선과 장식 다이아몬드 없이 포멀한 번호 목록을 사용한다', async ({ page }) => {
+test('전체 요약은 구분선과 장식 아이콘 없이 포멀한 불릿 목록을 사용하고 공식 타임라인을 노출하지 않는다', async ({ page }) => {
   await page.goto('/', { waitUntil: 'networkidle' });
-  const summaryList = page.locator('#summary > ol');
+  const summaryList = page.locator('#summary > ul');
   const firstItem = summaryList.locator('li').first();
 
   await expect(summaryList).toBeVisible();
   await expect(summaryList.locator('li')).toHaveCount(8);
+  await expect(page.locator('#timeline')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '공식 타임라인' })).toHaveCount(0);
 
   const style = await firstItem.evaluate(element => ({
     listStyleType: getComputedStyle(element).listStyleType,
     borderTopStyle: getComputedStyle(element).borderTopStyle,
     beforeContent: getComputedStyle(element, '::before').content
   }));
-  expect(style.listStyleType).toBe('decimal-leading-zero');
+  expect(style.listStyleType).toBe('disc');
   expect(style.borderTopStyle).toBe('none');
   expect(style.beforeContent).toBe('none');
 });
