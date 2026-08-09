@@ -15,6 +15,8 @@
   const backToTop = document.getElementById('backToTop');
   const chapterNumber = document.getElementById('currentChapterNumber');
   const readingStatus = document.getElementById('readingStatus');
+  const chapterProgress = document.getElementById('chapterProgress');
+  const chapterProgressFill = document.getElementById('chapterProgressFill');
   const railTopics = document.getElementById('railTopics');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const modalSiblings = [...body.children].filter(element => element !== drawer && element !== backdrop);
@@ -26,6 +28,7 @@
   let currentRailChapter = null;
   let activeChapter = null;
   let activeTopic = null;
+  let progressChapter = null;
   let initialHashPending = Boolean(location.hash);
   const drawerDetails = [...drawer.querySelectorAll('details')];
   const topicNumber = (chapter, index) => `${chapter}-${index + 1}`;
@@ -388,9 +391,35 @@
     });
   };
 
+  // The reading line is 26 CSS pixels below the fixed header. Within [start, end),
+  // chapter progress is clamp((readingLine - start) / (end - start), 0, 1).
+  const updateChapterProgress = (currentChapter, readingLine) => {
+    const chapterChanged = currentChapter !== progressChapter;
+    progressChapter = currentChapter;
+    let amount = 0;
+    let label = '랴오헝 인터뷰';
+    if (currentChapter) {
+      const index = chapterElements.indexOf(currentChapter);
+      const nextChapter = chapterElements[index + 1];
+      const start = window.scrollY + currentChapter.getBoundingClientRect().top;
+      const end = nextChapter
+        ? window.scrollY + nextChapter.getBoundingClientRect().top
+        : document.documentElement.scrollHeight - window.innerHeight + (readingLine - window.scrollY);
+      amount = end > start ? Math.min(1, Math.max(0, (readingLine - start) / (end - start))) : 0;
+      label = currentChapter.querySelector('.chapter-heading h2')?.textContent || '';
+    }
+    if (chapterChanged) chapterProgressFill.classList.add('is-chapter-change');
+    chapterProgressFill.style.transform = `scaleX(${amount})`;
+    chapterProgress.setAttribute('aria-valuenow', String(Math.round(amount * 100)));
+    chapterProgress.setAttribute('aria-label', `${label} 읽기 진행률`);
+    if (chapterChanged) requestAnimationFrame(() => chapterProgressFill.classList.remove('is-chapter-change'));
+  };
+
   const updateViewportState = () => {
     scrollTicking = false;
-    const probe = headerOffset() + 26;
+    const header = document.querySelector('.site-header');
+    const probe = (header ? header.getBoundingClientRect().bottom : 64) + 26;
+    const readingLine = window.scrollY + probe;
     let currentChapter = null;
     for (const chapter of chapterElements) {
       if (chapter.getBoundingClientRect().top <= probe) currentChapter = chapter;
@@ -404,6 +433,7 @@
       setActiveLinks('[data-nav-chapter]', 'navChapter', null);
       setActiveLinks('[data-nav-topic]', 'navTopic', null);
       renderRailTopics(null);
+      updateChapterProgress(null, readingLine);
       return;
     }
 
@@ -423,7 +453,7 @@
     activeTopic = markerInChapter;
     setActiveLinks('[data-nav-topic]', 'navTopic', markerInChapter);
     setActiveLinks('[data-rail-topic]', 'railTopic', markerInChapter);
-
+    updateChapterProgress(currentChapter, readingLine);
   };
 
   const updateProgress = () => {
@@ -435,10 +465,12 @@
   };
 
   const onScroll = () => {
-    updateProgress();
     if (!scrollTicking) {
       scrollTicking = true;
-      requestAnimationFrame(updateViewportState);
+      requestAnimationFrame(() => {
+        updateProgress();
+        updateViewportState();
+      });
     }
   };
   window.addEventListener('scroll', onScroll, { passive: true });

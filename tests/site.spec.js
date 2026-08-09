@@ -181,6 +181,148 @@ test('확장 챕터 제목은 세 탐색 위치에서 일치하고 공식 타임
   expect(titles.timeline).toEqual(officialTimelineTitles);
 });
 
+test('고정 헤더는 작은 사이트 타이틀 위·동적 장 제목 아래의 2줄 구조를 유지한다', async ({ page }) => {
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/#chapter-1', { waitUntil: 'networkidle' });
+    await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+
+    const header = page.locator('.site-header');
+    const fixedTitle = header.locator('.header-site-title');
+    const chapterTitle = header.locator('#readingStatus');
+    await expect(fixedTitle).toHaveCount(1);
+    await expect(fixedTitle).toHaveText('랴오헝 인터뷰', { useInnerText: false });
+    await expect(chapterTitle).toHaveText(expandedChapterTitles[0]);
+
+    const chapterFour = page.locator('#chapter-4');
+    await chapterFour.evaluate(element => window.scrollTo(0, window.scrollY + element.getBoundingClientRect().top - 90));
+    await expect(chapterTitle).toHaveText(expandedChapterTitles[3]);
+
+    const geometry = await header.evaluate(element => {
+      const fixed = element.querySelector('.header-site-title');
+      const dynamic = element.querySelector('#readingStatus');
+      const fixedBox = fixed.getBoundingClientRect();
+      const dynamicBox = dynamic.getBoundingClientRect();
+      const headerBox = element.getBoundingClientRect();
+      const fixedStyle = getComputedStyle(fixed);
+      const dynamicStyle = getComputedStyle(dynamic);
+      return {
+        domOrder: Boolean(fixed.compareDocumentPosition(dynamic) & Node.DOCUMENT_POSITION_FOLLOWING),
+        verticallyOrdered: fixedBox.bottom <= dynamicBox.top + 1,
+        insideHeader: fixedBox.top >= headerBox.top && dynamicBox.bottom <= headerBox.bottom + 1,
+        fixedSize: parseFloat(fixedStyle.fontSize),
+        dynamicSize: parseFloat(dynamicStyle.fontSize),
+        dynamicOneLine: dynamicBox.height <= parseFloat(dynamicStyle.lineHeight) + 1,
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+      };
+    });
+    expect(geometry.domOrder).toBeTruthy();
+    expect(geometry.verticallyOrdered).toBeTruthy();
+    expect(geometry.insideHeader).toBeTruthy();
+    expect(geometry.fixedSize).toBeGreaterThanOrEqual(10);
+    expect(geometry.fixedSize).toBeLessThanOrEqual(12);
+    expect(geometry.fixedSize).toBeLessThan(geometry.dynamicSize);
+    expect(geometry.dynamicOneLine).toBeTruthy();
+    expect(geometry.horizontalOverflow).toBeLessThanOrEqual(0);
+
+    const targetTop = await chapterFour.evaluate(element => element.getBoundingClientRect().top);
+    const headerHeight = await header.evaluate(element => element.getBoundingClientRect().height);
+    expect(targetTop).toBeGreaterThanOrEqual(headerHeight);
+
+    if (viewport.width === 390) {
+      await page.locator('#menuButton').click();
+      await expect(page.locator('#tocDrawer')).toBeVisible();
+      await expect(page.locator('#menuButton')).toHaveAttribute('aria-expanded', 'true');
+      await page.locator('#closeDrawer').click();
+    }
+  }
+});
+
+test('헤더 진행 바는 현재 장의 reading line 기준 진행률·ARIA·geometry를 390px·1280px에서 반영한다', async ({ page }) => {
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/#chapter-1', { waitUntil: 'networkidle' });
+    await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+
+    const progress = page.locator('#chapterProgress');
+    const fill = page.locator('#chapterProgressFill');
+    await expect(progress).toHaveAttribute('role', 'progressbar');
+    await expect(progress).toHaveAttribute('aria-valuemin', '0');
+    await expect(progress).toHaveAttribute('aria-valuemax', '100');
+    await expect(progress).toHaveAttribute('aria-label', `${expandedChapterTitles[0]} 읽기 진행률`);
+
+    const geometry = await progress.evaluate(element => {
+      const box = element.getBoundingClientRect();
+      const header = document.querySelector('.site-header').getBoundingClientRect();
+      const fill = element.querySelector('#chapterProgressFill');
+      const style = getComputedStyle(fill);
+      return {
+        atHeaderBottom: Math.abs(box.bottom - header.bottom) <= 1,
+        height: box.height,
+        insideViewport: box.left >= 0 && box.right <= document.documentElement.clientWidth,
+        origin: style.transformOrigin.split(' ')[0],
+        usesTransform: style.transform !== 'none',
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+      };
+    });
+    expect(geometry.atHeaderBottom).toBeTruthy();
+    expect(geometry.height).toBeGreaterThanOrEqual(2);
+    expect(geometry.height).toBeLessThanOrEqual(3);
+    expect(geometry.insideViewport).toBeTruthy();
+    expect(geometry.origin).toBe('0px');
+    expect(geometry.usesTransform).toBeTruthy();
+    expect(geometry.horizontalOverflow).toBeLessThanOrEqual(0);
+
+    const chapterOneValues = [];
+    for (const fraction of [0.15, 0.65]) {
+      await page.evaluate(fraction => {
+        const chapters = [...document.querySelectorAll('.transcript-chapter')];
+        const start = window.scrollY + chapters[0].getBoundingClientRect().top;
+        const end = window.scrollY + chapters[1].getBoundingClientRect().top;
+        const headerBottom = document.querySelector('.site-header').getBoundingClientRect().bottom;
+        const readingInset = 26;
+        window.scrollTo(0, start + (end - start) * fraction - headerBottom - readingInset);
+      }, fraction);
+      await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(Math.round(fraction * 100) - 1);
+      chapterOneValues.push(Number(await progress.getAttribute('aria-valuenow')));
+    }
+    expect(chapterOneValues[0]).toBeGreaterThanOrEqual(14);
+    expect(chapterOneValues[0]).toBeLessThanOrEqual(16);
+    expect(chapterOneValues[1]).toBeGreaterThanOrEqual(64);
+    expect(chapterOneValues[1]).toBeLessThanOrEqual(66);
+    expect(chapterOneValues[1]).toBeGreaterThan(chapterOneValues[0]);
+
+    const chapterFourExpected = await page.evaluate(() => {
+      const chapters = [...document.querySelectorAll('.transcript-chapter')];
+      const chapter = chapters[3];
+      const next = chapters[4];
+      const start = window.scrollY + chapter.getBoundingClientRect().top;
+      const end = window.scrollY + next.getBoundingClientRect().top;
+      const targetFraction = .31;
+      const headerBottom = document.querySelector('.site-header').getBoundingClientRect().bottom;
+      window.scrollTo(0, start + (end - start) * targetFraction - headerBottom - 26);
+      return Math.round(targetFraction * 100);
+    });
+    await expect(page.locator('#readingStatus')).toHaveText(expandedChapterTitles[3]);
+    await expect(progress).toHaveAttribute('aria-label', `${expandedChapterTitles[3]} 읽기 진행률`);
+    await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow'))).toBe(chapterFourExpected);
+    await expect.poll(() => fill.evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).a)).toBeCloseTo(chapterFourExpected / 100, 2);
+  }
+});
+
+test('헤더 진행 바는 감소 모션에서 transition과 animation을 완전히 제거한다', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#chapter-1', { waitUntil: 'networkidle' });
+  await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+  const motion = await page.locator('#chapterProgressFill').evaluate(element => {
+    const style = getComputedStyle(element);
+    return { transitionDuration: style.transitionDuration, animationName: style.animationName };
+  });
+  expect(motion.transitionDuration).toBe('0s');
+  expect(motion.animationName).toBe('none');
+});
+
 test('확장 제목은 390px 헤더에서 말줄임되고 목차·본문에서는 전체 줄바꿈된다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/#chapter-4', { waitUntil: 'networkidle' });
