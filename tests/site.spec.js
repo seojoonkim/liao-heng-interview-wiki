@@ -156,6 +156,61 @@ test('확장 제목은 390px 헤더에서 말줄임되고 목차·본문에서�
   expect(bodyFullyVisible).toBeTruthy();
 });
 
+test('본문 대챕터·중요 지점의 타이포그래피 위계와 행 배치를 보존한다', async ({ page }) => {
+  const contracts = [
+    { viewport: { width: 390, height: 844 }, chapterTitleSize: 34 },
+    { viewport: { width: 1280, height: 800 }, chapterTitleSize: 46 }
+  ];
+
+  for (const contract of contracts) {
+    await page.setViewportSize(contract.viewport);
+    await page.goto('/#chapter-4', { waitUntil: 'networkidle' });
+    await expect(page.locator('#transcript')).toHaveAttribute('aria-busy', 'false');
+
+    const result = await page.evaluate(() => {
+      const root = document.documentElement;
+      const content = document.querySelector('.content-column').getBoundingClientRect();
+      const markers = [...document.querySelectorAll('.highlight-marker')];
+      const insideContent = element => {
+        const box = element.getBoundingClientRect();
+        return box.left >= content.left - 1 && box.right <= content.right + 1
+          && element.scrollWidth <= element.clientWidth + 1
+          && element.scrollHeight <= element.clientHeight + 1;
+      };
+      const markerGeometry = markers.map(marker => {
+        const index = marker.querySelector('.highlight-index').getBoundingClientRect();
+        const title = marker.querySelector('h3').getBoundingClientRect();
+        const timestamp = marker.querySelector('.highlight-time').getBoundingClientRect();
+        return {
+          indexAboveTitle: index.bottom <= title.top + 1,
+          alignedLeft: Math.abs(index.left - title.left) <= 1,
+          timestampBelowTitle: timestamp.top >= title.bottom - 1,
+          fullyVisible: insideContent(marker.querySelector('h3'))
+        };
+      });
+      return {
+        chapterIndexSize: parseFloat(getComputedStyle(document.querySelector('.chapter-index')).fontSize),
+        chapterTitleSize: parseFloat(getComputedStyle(document.querySelector('.chapter-heading h2')).fontSize),
+        chapterFourFullyVisible: insideContent(document.querySelector('#chapter-4-title')),
+        allIndicesAboveTitles: markerGeometry.every(item => item.indexAboveTitle),
+        allMarkerLeftsAligned: markerGeometry.every(item => item.alignedLeft),
+        allTimestampsBelowTitles: markerGeometry.every(item => item.timestampBelowTitle),
+        allMarkerTitlesFullyVisible: markerGeometry.every(item => item.fullyVisible),
+        horizontalOverflow: root.scrollWidth - root.clientWidth
+      };
+    });
+
+    expect.soft(result.chapterIndexSize, `${contract.viewport.width}px chapter index`).toBe(14);
+    expect.soft(result.chapterTitleSize, `${contract.viewport.width}px chapter h2`).toBe(contract.chapterTitleSize);
+    expect.soft(result.allIndicesAboveTitles).toBeTruthy();
+    expect.soft(result.allMarkerLeftsAligned).toBeTruthy();
+    expect.soft(result.allTimestampsBelowTitles).toBeTruthy();
+    expect.soft(result.chapterFourFullyVisible).toBeTruthy();
+    expect.soft(result.allMarkerTitlesFullyVisible).toBeTruthy();
+    expect.soft(result.horizontalOverflow).toBeLessThanOrEqual(0);
+  }
+});
+
 test('본문 타이포그래피와 제목 행간은 390px·1280px에서 가독성과 전체 표시를 보존한다', async ({ page }) => {
   const contracts = [
     {
@@ -171,7 +226,7 @@ test('본문 타이포그래피와 제목 행간은 390px·1280px에서 가독�
         '.transcript-state': 17,
         '.transcript-disclaimer': 14,
         '.transcript-paragraph': 16.5,
-        '.highlight-marker h3': 21
+        '.highlight-marker h3': 22
       }
     },
     {
