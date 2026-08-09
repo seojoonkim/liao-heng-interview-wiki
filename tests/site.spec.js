@@ -32,6 +32,65 @@ const expectedTopicLabels = chapterTopicCounts.flatMap((count, chapterIndex) =>
 const expectedTopicIds = Array.from({ length: 35 }, (_, index) => String(index + 1));
 const forbiddenLabels = ['IMPORTANT TOPIC', '이 장의 요약', 'INTERVIEW OVERVIEW', 'FULL TRANSCRIPT · 한국어 번역', 'FIELD NOTE', 'NAVIGATION'];
 
+test('히어로 랴오헝 사진은 로컬 공식 출처와 접근성·반응형 geometry 계약을 지킨다', async ({ page }) => {
+  const contracts = [
+    { viewport: { width: 390, height: 844 }, maxImageHeight: 240 },
+    { viewport: { width: 1000, height: 800 }, maxImageHeight: 560 },
+    { viewport: { width: 1024, height: 800 }, maxImageHeight: 560 },
+    { viewport: { width: 1100, height: 800 }, maxImageHeight: 560 },
+    { viewport: { width: 1150, height: 800 }, maxImageHeight: 560 },
+    { viewport: { width: 1280, height: 800 }, maxImageHeight: 560 }
+  ];
+
+  for (const contract of contracts) {
+    await page.setViewportSize(contract.viewport);
+    await page.goto('/', { waitUntil: 'networkidle' });
+    const figure = page.locator('.hero-portrait');
+    const image = figure.locator('img');
+    const source = figure.locator('a');
+
+    await expect(figure).toBeVisible();
+    await expect(image).toHaveAttribute('src', 'assets/liao-heng-portrait.webp');
+    await expect(image).toHaveAttribute('alt', /화웨이 반도체 수석과학자 랴오헝/);
+    await expect(image).toHaveAttribute('width', /^\d+$/);
+    await expect(image).toHaveAttribute('height', /^\d+$/);
+    await expect(image).toHaveAttribute('loading', 'eager');
+    await expect(image).toHaveAttribute('fetchpriority', 'high');
+    await expect(source).toHaveAttribute('href', 'https://www.bilibili.com/video/BV1nB3u6tERu/');
+    await expect(figure.locator('figcaption')).toContainText('Bilibili 공식 영상 커버');
+
+    const geometry = await page.evaluate(() => {
+      const box = selector => document.querySelector(selector).getBoundingClientRect();
+      const hero = box('.hero');
+      const portrait = box('.hero-portrait');
+      const image = document.querySelector('.hero-portrait img');
+      const title = box('#page-title');
+      const deck = box('.hero-deck');
+      const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      return {
+        hero: { top: hero.top, right: hero.right, bottom: hero.bottom, left: hero.left },
+        portrait: { top: portrait.top, right: portrait.right, bottom: portrait.bottom, left: portrait.left, width: portrait.width, height: portrait.height },
+        image: { width: image.getBoundingClientRect().width, height: image.getBoundingClientRect().height, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight },
+        insideHero: portrait.left >= hero.left - 1 && portrait.right <= hero.right + 1 && portrait.top >= hero.top - 1 && portrait.bottom <= hero.bottom + 1,
+        coversTitle: intersects(portrait, title),
+        coversDeck: intersects(portrait, deck),
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+      };
+    });
+
+    expect(geometry.image.naturalWidth).toBeGreaterThan(0);
+    expect(geometry.image.naturalHeight).toBeGreaterThan(0);
+    expect(geometry.portrait.width).toBeGreaterThan(0);
+    expect(geometry.portrait.height).toBeGreaterThan(0);
+    expect(geometry.portrait.height).toBeLessThanOrEqual(contract.maxImageHeight);
+    expect(geometry.insideHero).toBeTruthy();
+    expect(geometry.coversTitle).toBeFalsy();
+    expect(geometry.coversDeck).toBeFalsy();
+    expect(geometry.horizontalOverflow).toBeLessThanOrEqual(0);
+    expect(geometry.image.width / geometry.image.height).toBeCloseTo(geometry.image.naturalWidth / geometry.image.naturalHeight, 2);
+  }
+});
+
 test('중요 지점은 장-로컬 번호를 쓰되 기존 topic 링크 계약을 보존한다', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/', { waitUntil: 'networkidle' });
